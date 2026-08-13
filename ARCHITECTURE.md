@@ -174,7 +174,7 @@ sequenceDiagram
 - [x] Automated 24/7 keep-alive GitHub Actions workflow (`keep-alive.yml`).
 - [x] Live public demo setup at [syntrak.harsh-shah.me](https://syntrak.harsh-shah.me).
 
-### Phase 4: Semantic Context & Tree-Sitter Integration 🔄 (In Progress)
+<!-- ### Phase 4: Semantic Context & Tree-Sitter Integration 🔄 (In Progress)
 - [ ] Tree-sitter AST parsing for intelligent syntax-aware symbol navigation.
 - [ ] Local vector embeddings (e.g. `chromadb` / `fastembed`) for semantic codebase indexing.
 - [ ] Project-wide symbol dependency graph analysis for multi-file refactoring.
@@ -188,7 +188,7 @@ sequenceDiagram
 ### Phase 6: IDE & Editor Ecosystem 📋 (Planned)
 - [ ] VS Code Extension (Sidecar communication with `syntrak serve`).
 - [ ] Native Neovim plugin (`syntrak.nvim` via Lua RPC).
-- [ ] JetBrains IDE plugin.
+- [ ] JetBrains IDE plugin. -->
 
 ---
 
