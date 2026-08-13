@@ -2,37 +2,160 @@
    syntrak.nvim — Neovim / Tmux Monospace Developer Console Stylesheet
    ========================================================================== */
 
-:root {
-  /* Tokyo Night / Catppuccin Mocha Monospace Palette */
-  --bg-darkest: #11111b;
-  --bg-editor: #181825;
-  --bg-surface: #1e1e2e;
-  --bg-elevated: #252538;
-  --bg-highlight: #313244;
+/* Default / Gruvbox Dark (Warm Retro Hacker) */
+:root, [data-theme="gruvbox"] {
+  --bg-darkest: #1d2021;
+  --bg-editor: #282828;
+  --bg-surface: #32302f;
+  --bg-elevated: #3c3836;
+  --bg-highlight: #504945;
   
-  --border-muted: #313244;
-  --border-focus: #89b4fa;
+  --border-muted: #3c3836;
+  --border-focus: #fabd2f;
   
-  --text-main: #cdd6f4;
-  --text-dim: #6c7086;
+  --text-main: #ebdbb2;
+  --text-dim: #928374;
+  --text-bright: #fbf1c7;
+  
+  --mode-normal-bg: #fabd2f; /* Gruvbox Yellow */
+  --mode-normal-fg: #282828;
+  --mode-insert-bg: #b8bb26; /* Gruvbox Green */
+  --mode-insert-fg: #282828;
+  --mode-exec-bg: #fe8019;   /* Gruvbox Orange */
+  --mode-exec-fg: #282828;
+  
+  --color-green: #b8bb26;
+  --color-yellow: #fabd2f;
+  --color-orange: #fe8019;
+  --color-red: #fb4934;
+  --color-purple: #d3869b;
+  --color-cyan: #8ec07c;
+  --color-blue: #83a598;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+/* Tokyo Night */
+[data-theme="tokyonight"] {
+  --bg-darkest: #16161e;
+  --bg-editor: #1a1b26;
+  --bg-surface: #24283b;
+  --bg-elevated: #2f3549;
+  --bg-highlight: #414868;
+  
+  --border-muted: #292e42;
+  --border-focus: #7aa2f7;
+  
+  --text-main: #c0caf5;
+  --text-dim: #565f89;
   --text-bright: #ffffff;
   
-  /* Neovim Mode Colors */
-  --mode-normal-bg: #89b4fa; /* Blue */
-  --mode-normal-fg: #11111b;
-  --mode-insert-bg: #a6e3a1; /* Green */
-  --mode-insert-fg: #11111b;
-  --mode-exec-bg: #f9e2af;   /* Yellow */
-  --mode-exec-fg: #11111b;
+  --mode-normal-bg: #7aa2f7;
+  --mode-normal-fg: #1a1b26;
+  --mode-insert-bg: #9ece6a;
+  --mode-insert-fg: #1a1b26;
+  --mode-exec-bg: #e0af68;
+  --mode-exec-fg: #1a1b26;
   
-  --color-green: #a6e3a1;
-  --color-yellow: #f9e2af;
-  --color-red: #f38ba8;
-  --color-purple: #cba6f7;
-  --color-cyan: #89dceb;
-  --color-blue: #89b4fa;
+  --color-green: #9ece6a;
+  --color-yellow: #e0af68;
+  --color-orange: #ff9e64;
+  --color-red: #f7768e;
+  --color-purple: #bb9af7;
+  --color-cyan: #7dcfff;
+  --color-blue: #7aa2f7;
+}
+
+/* Nord (Arctic Frost) */
+[data-theme="nord"] {
+  --bg-darkest: #242933;
+  --bg-editor: #2e3440;
+  --bg-surface: #3b4252;
+  --bg-elevated: #434c5e;
+  --bg-highlight: #4c566a;
   
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --border-muted: #434c5e;
+  --border-focus: #88c0d0;
+  
+  --text-main: #d8dee9;
+  --text-dim: #616e88;
+  --text-bright: #eceff4;
+  
+  --mode-normal-bg: #88c0d0;
+  --mode-normal-fg: #2e3440;
+  --mode-insert-bg: #a3be8c;
+  --mode-insert-fg: #2e3440;
+  --mode-exec-bg: #ebcb8b;
+  --mode-exec-fg: #2e3440;
+  
+  --color-green: #a3be8c;
+  --color-yellow: #ebcb8b;
+  --color-orange: #d08770;
+  --color-red: #bf616a;
+  --color-purple: #b48ead;
+  --color-cyan: #8fbcbb;
+  --color-blue: #81a1c1;
+}
+
+/* Monokai Pro (High Contrast Hacker) */
+[data-theme="monokai"] {
+  --bg-darkest: #19181a;
+  --bg-editor: #221f22;
+  --bg-surface: #2d2a2e;
+  --bg-elevated: #3a353b;
+  --bg-highlight: #4a444b;
+  
+  --border-muted: #3a353b;
+  --border-focus: #ffd866;
+  
+  --text-main: #fcfcfa;
+  --text-dim: #727072;
+  --text-bright: #ffffff;
+  
+  --mode-normal-bg: #ffd866;
+  --mode-normal-fg: #221f22;
+  --mode-insert-bg: #a9dc76;
+  --mode-insert-fg: #221f22;
+  --mode-exec-bg: #fc9867;
+  --mode-exec-fg: #221f22;
+  
+  --color-green: #a9dc76;
+  --color-yellow: #ffd866;
+  --color-orange: #fc9867;
+  --color-red: #ff6188;
+  --color-purple: #ab9df2;
+  --color-cyan: #78dce8;
+  --color-blue: #78dce8;
+}
+
+/* Solarized Dark */
+[data-theme="solarized"] {
+  --bg-darkest: #00212b;
+  --bg-editor: #002b36;
+  --bg-surface: #073642;
+  --bg-elevated: #0a4756;
+  --bg-highlight: #0d586a;
+  
+  --border-muted: #073642;
+  --border-focus: #268bd2;
+  
+  --text-main: #93a1a1;
+  --text-dim: #586e75;
+  --text-bright: #eee8d5;
+  
+  --mode-normal-bg: #2aa198;
+  --mode-normal-fg: #002b36;
+  --mode-insert-bg: #859900;
+  --mode-insert-fg: #002b36;
+  --mode-exec-bg: #b58900;
+  --mode-exec-fg: #002b36;
+  
+  --color-green: #859900;
+  --color-yellow: #b58900;
+  --color-orange: #cb4b16;
+  --color-red: #dc322f;
+  --color-purple: #6c71c4;
+  --color-cyan: #2aa198;
+  --color-blue: #268bd2;
 }
 
 * {
@@ -50,6 +173,7 @@ body {
   overflow: hidden;
   font-size: 13.5px;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .nvim-container {
@@ -101,7 +225,7 @@ body {
 .buffer-tab.active {
   background-color: var(--bg-editor);
   color: var(--text-bright);
-  border-top: 2px solid var(--color-blue);
+  border-top: 2px solid var(--color-yellow);
 }
 
 .tab-index {
@@ -116,8 +240,39 @@ body {
 .bufferline-right {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding-right: 14px;
+  gap: 10px;
+  padding-right: 12px;
+}
+
+.theme-selector-box {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-muted);
+  border-radius: 3px;
+  padding: 2px 6px;
+}
+
+.theme-selector-box label {
+  font-size: 11px;
+  color: var(--color-yellow);
+  font-weight: 700;
+}
+
+select#themeSelect {
+  background: transparent;
+  border: none;
+  color: var(--text-bright);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  outline: none;
+  cursor: pointer;
+}
+
+select#themeSelect option {
+  background-color: var(--bg-darkest);
+  color: var(--text-main);
 }
 
 .quick-nav-actions {
@@ -142,8 +297,8 @@ body {
 
 .btn-nvim-action:hover {
   background: var(--bg-highlight);
-  color: var(--color-blue);
-  border-color: var(--color-blue);
+  color: var(--color-yellow);
+  border-color: var(--color-yellow);
 }
 
 .nvim-version {
@@ -217,7 +372,7 @@ body {
 .ascii-banner {
   font-size: 10.5px;
   line-height: 1.15;
-  color: var(--color-blue);
+  color: var(--color-yellow);
   font-weight: 700;
   margin-bottom: 0.85rem;
   overflow-x: auto;
@@ -260,7 +415,7 @@ body {
 }
 
 .cmd-chip:hover {
-  border-color: var(--color-blue);
+  border-color: var(--color-yellow);
   background-color: var(--bg-highlight);
 }
 
@@ -295,18 +450,18 @@ body {
 }
 
 .user-prompt-badge .user-host {
-  color: var(--color-blue);
+  color: var(--color-yellow);
 }
 
 .user-prompt-badge .user-branch {
-  color: var(--color-yellow);
+  color: var(--color-orange);
   font-size: 11px;
 }
 
 .message-content {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-muted);
-  border-left: 3px solid var(--color-blue);
+  border-left: 3px solid var(--color-yellow);
   border-radius: 4px;
   padding: 12px 16px;
   font-size: 13px;
@@ -358,7 +513,7 @@ body {
   margin: 10px 0;
   border-radius: 4px;
   border: 1px solid var(--color-purple);
-  background: rgba(17, 17, 27, 0.85);
+  background: rgba(29, 32, 33, 0.85);
   overflow: hidden;
 }
 
@@ -367,11 +522,11 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 5px 10px;
-  background: rgba(203, 166, 247, 0.15);
+  background: rgba(211, 134, 155, 0.15);
   font-size: 11.5px;
   font-weight: 600;
   color: var(--color-purple);
-  border-bottom: 1px solid rgba(203, 166, 247, 0.2);
+  border-bottom: 1px solid rgba(211, 134, 155, 0.2);
 }
 
 .tool-card-body {
@@ -389,9 +544,9 @@ body {
 }
 
 .tool-result-success .tool-card-header {
-  background: rgba(166, 227, 161, 0.15);
+  background: rgba(184, 187, 38, 0.15);
   color: var(--color-green);
-  border-bottom-color: rgba(166, 227, 161, 0.2);
+  border-bottom-color: rgba(184, 187, 38, 0.2);
 }
 
 /* ==========================================================================
@@ -527,7 +682,7 @@ textarea#promptInput {
 
 .s-cmd {
   font-weight: 700;
-  color: var(--color-blue);
+  color: var(--color-yellow);
 }
 
 .s-desc {
@@ -577,7 +732,7 @@ textarea#promptInput {
 .btn-nvim-save {
   align-self: flex-start;
   margin-top: 6px;
-  background-color: var(--color-blue);
+  background-color: var(--color-yellow);
   color: var(--bg-darkest);
   border: none;
   font-family: var(--font-mono);
@@ -626,7 +781,7 @@ textarea#promptInput {
 
 .p-row:hover {
   background-color: var(--bg-surface);
-  border-color: var(--color-blue);
+  border-color: var(--color-yellow);
 }
 
 .p-name {
@@ -791,14 +946,14 @@ textarea#promptInput {
 }
 
 .stl-arrow-r1 {
-  color: var(--color-blue);
+  color: var(--color-yellow);
   background-color: var(--bg-surface);
   font-size: 16px;
   line-height: 1;
 }
 
 .stl-host {
-  background-color: var(--color-blue);
+  background-color: var(--color-yellow);
   color: var(--bg-darkest);
   padding: 0 10px;
   height: 100%;

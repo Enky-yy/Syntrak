@@ -5,6 +5,7 @@
 let activeAbortController = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+  initThemeSelector();
   initTabs();
   initSlashPopup();
   initChatForm();
@@ -17,6 +18,30 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnClearChat')?.addEventListener('click', clearChat);
   document.getElementById('configForm')?.addEventListener('submit', handleConfigSave);
 });
+
+/* Theme Selector (:colorscheme) */
+function initThemeSelector() {
+  const select = document.getElementById('themeSelect');
+  const savedTheme = localStorage.getItem('syntrak_theme') || 'gruvbox';
+
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  if (select) {
+    select.value = savedTheme;
+    select.addEventListener('change', (e) => {
+      setTheme(e.target.value);
+    });
+  }
+}
+
+function setTheme(themeName) {
+  const validThemes = ['gruvbox', 'tokyonight', 'nord', 'monokai', 'solarized'];
+  const theme = validThemes.includes(themeName) ? themeName : 'gruvbox';
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('syntrak_theme', theme);
+  const select = document.getElementById('themeSelect');
+  if (select) select.value = theme;
+  showToast(`:colorscheme ${theme}`);
+}
 
 /* Tab Navigation (Buffer switching) */
 function initTabs() {
@@ -128,6 +153,11 @@ function initChatForm() {
     }
     if (query === '/undo' || query === ':undo') {
       handleUndo();
+      return;
+    }
+    if (query.startsWith(':colorscheme ') || query.startsWith(':cs ')) {
+      const theme = query.split(' ')[1]?.trim();
+      setTheme(theme);
       return;
     }
     if (query === ':w' || query === ':config') {
