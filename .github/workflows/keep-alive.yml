@@ -1,0 +1,29 @@
+name: Keep Render Service Awake
+
+on:
+  schedule:
+    # Runs every 10 minutes to prevent Render free instance from sleeping (spins down after 15m)
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  ping-render:
+    name: Ping Render Health / Status Endpoint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Syntrak Server
+        run: |
+          URL="${{ secrets.RENDER_APP_URL }}"
+          if [ -z "$URL" ]; then
+            echo "ERROR: RENDER_APP_URL secret is not set."
+            echo "Please add RENDER_APP_URL in GitHub Repository Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+          echo "Pinging $URL/api/session/status ..."
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL/api/session/status")
+          echo "Received HTTP status: $STATUS_CODE"
+          if [ "$STATUS_CODE" -eq 200 ] || [ "$STATUS_CODE" -eq 301 ] || [ "$STATUS_CODE" -eq 302 ]; then
+            echo "Render service is awake and healthy!"
+          else
+            echo "Service returned status $STATUS_CODE (waking up or starting)."
+          fi
