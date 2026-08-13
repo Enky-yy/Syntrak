@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-syntrak.harsh--shah.me-2ea44f.svg)](https://syntrak.harsh-shah.me)
 
-🌐 **Live Demo**: [https://syntrak.harsh-shah.me](https://syntrak.harsh-shah.me)
+🌐 **Live Demo**: [https://syntrak.harsh-shah.me](https://syntrak.harsh-shah.me) | 📐 **[Architecture & Implementation Plan](ARCHITECTURE.md)**
 
 ---
 
