@@ -12,6 +12,7 @@
 
 - 🧠 **Multi-Provider & Cloud Model Support**: Works seamlessly with **Ollama**, **NVIDIA NIM**, **OpenRouter**, **vLLM**, **LM Studio**, **OpenAI**, **Anthropic Claude**, **Google Gemini**, **Groq**, or any OpenAI-compatible API.
 - ⚡ **Interactive Terminal REPL**: Built on `prompt_toolkit` and `rich` with command auto-completion, history navigation, streaming markdown, and collapsible tool execution panels.
+- 💻 **Neovim & Tmux Monospace Web Console**: Built-in high-density developer dashboard (`syntrak.nvim`) running in your browser with live buffer tabs, statuslines, and 5 classic color schemes.
 - 🔍 **Automated Code Reviewer**: Run `/review` or `syntrak review` to inspect git diffs for bugs, security vulnerabilities, edge cases, and actionable code fixes.
 - ✏️ **Targeted Code Writer**: Intelligent search-and-replace chunk editing (`replace_in_file`), whole-file manipulation, and safe execution bounds.
 - 🛡️ **Safety & Git Rollback**: Automatic checkpointing via git snapshots allows you to `/undo` changes safely.
@@ -44,6 +45,33 @@ syntrak
 syntrak --model ollama/qwen2.5-coder:latest
 syntrak --model openai/meta/llama-3.1-8b-instruct --api-base https://integrate.api.nvidia.com/v1 --api-key nvapi-xxxx
 ```
+
+---
+
+## 💻 Web UI Console (`syntrak.nvim`)
+
+Launch the built-in browser-based Neovim developer console:
+
+```bash
+syntrak serve --port 8000
+```
+Open **[http://localhost:8000](http://localhost:8000)** to access the developer workspace.
+
+### 🎨 Built-in Color Schemes
+Switch color schemes instantly using the **`:colorscheme`** selector or by typing `:colorscheme <name>` in the prompt bar:
+
+| Theme | Command | Aesthetic |
+| :--- | :--- | :--- |
+| **Gruvbox Dark** *(Default)* | `:colorscheme gruvbox` | Classic warm retro hacker palette (charcoal, amber, green, terracotta) |
+| **Nord** | `:colorscheme nord` | Arctic frost slate with ice blues and snow white |
+| **Tokyo Night** | `:colorscheme tokyonight` | Deep night sky indigo with electric cyan and violet |
+| **Monokai Pro** | `:colorscheme monokai` | High-contrast hacker theme with vibrant yellow and green |
+| **Solarized Dark** | `:colorscheme solarized` | Precision optical low-contrast dark teal & cyan |
+
+### 📑 Bufferline Tabs & Navigation
+- `[ 1: agent.buf ]` — Real-time interactive AI chat with terminal prompt formatting and streaming code outputs.
+- `[ 2: review.diff ]` — Automated code review buffer for PR and diff audits.
+- `[ 3: config.lua ]` — Live model and provider configuration editor.
 
 ---
 
@@ -135,8 +163,8 @@ syntrak --model openai/meta/llama-3.1-8b-instruct --api-base https://integrate.a
 
 #### Method E: Inside the Web UI (`http://localhost:8000`)
 1. Start the web server: `syntrak serve --port 8000`
-2. Click the **Settings** tab in the sidebar (or click the **MODEL** badge in the top bar).
-3. Select a preset (Ollama, NVIDIA NIM, DeepSeek-R1) or enter your custom model identifier, API Base URL, and API Key, then click **Save & Apply Settings**.
+2. Navigate to the **`config.lua`** tab (or type `:config` in the command prompt).
+3. Select a preset (Ollama, NVIDIA NIM, DeepSeek-R1) or enter your custom model identifier, API Base URL, and API Key, then click **`:w (Save Settings)`**.
 
 #### Method F: Live Switching in REPL (`/model`)
 Switch models on the fly during an active terminal session:
@@ -147,28 +175,30 @@ Switch models on the fly during an active terminal session:
 
 ---
 
-## ⌨️ Interactive Slash Commands
+## ⌨️ Interactive Commands & Keybindings
 
-Inside the REPL, type `/` to see autocompletions:
+Inside the REPL or Web Console, type `/` or `:` to see available commands:
 
 | Command | Description |
 | :--- | :--- |
-| `/review` | Perform automated code review on current diff (unstaged/staged) |
+| `/review` or `:Review` | Perform automated code review on current diff (unstaged/staged) |
 | `/diff` | Render syntax-highlighted git diff |
 | `/commit` | Generate a Conventional Commit message and commit changes |
 | `/model [name]` | View active model or switch to a new model on the fly |
-| `/undo` | Rollback to the previous git checkpoint |
+| `/undo` or `:Undo` | Rollback to the previous git checkpoint |
 | `/compact` | Summarize and compact conversation memory |
-| `/clear` | Clear chat history |
-| `/config` | Print active configuration and endpoint settings |
-| `/help` | Show command menu |
+| `/clear` or `:clear` | Clear chat history / buffer |
+| `:colorscheme [theme]` | Switch Web UI theme (`gruvbox`, `nord`, `tokyonight`, `monokai`, `solarized`) |
+| `/config` or `:config` | Print active configuration and endpoint settings |
+| `/help` or `:help` | Show command menu |
 | `/exit` | Exit the session |
 
 ---
 
-## 🛠️ CLI Usage & Automation
+## 🛠️ CLI Headless Usage & Automation
 
 Syntrak supports headless execution for scripts and CI/CD pipelines:
+
 
 ```bash
 # Non-interactive query
@@ -192,7 +222,7 @@ syntrak serve --port 8000
 ## 🌐 Web Architecture & Endpoints
 
 When running `syntrak serve --port 8000`, the following endpoints are available:
-- `GET /`: Clean institutional web dashboard.
+- `GET /`: Neovim / Tmux monospace developer dashboard.
 - `POST /api/chat/stream`: Server-Sent Events (SSE) streaming real-time tokens, thoughts, and tool execution status.
 - `GET /api/session/status`: Active session metadata and git status.
 - `POST /api/model`: Switch active model and API base dynamically.
