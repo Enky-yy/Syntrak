@@ -3,11 +3,11 @@ services:
     name: syntrak-web
     runtime: python
     plan: free
-    buildCommand: pip install .
+    buildCommand: pip install --upgrade pip && pip install .
     startCommand: syntrak serve --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.0
+        value: 3.11.10
       - key: OPENROUTER_API_KEY
         sync: false
       - key: NVIDIA_API_KEY
