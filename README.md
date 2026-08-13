@@ -5,6 +5,9 @@
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-syntrak.harsh--shah.me-2ea44f.svg)](https://syntrak.harsh-shah.me)
+
+🌐 **Live Demo**: [https://syntrak.harsh-shah.me](https://syntrak.harsh-shah.me)
 
 ---
 
@@ -50,12 +53,12 @@ syntrak --model openai/meta/llama-3.1-8b-instruct --api-base https://integrate.a
 
 ## 💻 Web UI Console (`syntrak.nvim`)
 
-Launch the built-in browser-based Neovim developer console:
+Try the live online demo at **[https://syntrak.harsh-shah.me](https://syntrak.harsh-shah.me)** or run it locally:
 
 ```bash
 syntrak serve --port 8000
 ```
-Open **[http://localhost:8000](http://localhost:8000)** to access the developer workspace.
+Open **[http://localhost:8000](http://localhost:8000)** (or your custom domain) to access the developer workspace.
 
 ### 🎨 Built-in Color Schemes
 Switch color schemes instantly using the **`:colorscheme`** selector or by typing `:colorscheme <name>` in the prompt bar:
