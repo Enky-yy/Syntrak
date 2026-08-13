@@ -1,9 +1,9 @@
-"""Git operations and repository versioning tools for CampusCLI."""
+"""Git operations and repository versioning tools for Syntrak."""
 
 import os
 from pathlib import Path
 from typing import Dict, List, Optional
-from campuscli.tools.base import default_registry
+from syntrak.tools.base import default_registry
 
 
 def _run_git(args: List[str], cwd: Optional[str] = None) -> str:

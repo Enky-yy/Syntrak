@@ -1,4 +1,4 @@
-"""Conversation history and token-aware memory compaction for CampusCLI."""
+"""Conversation history and token-aware memory compaction for Syntrak."""
 
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field

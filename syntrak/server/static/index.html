@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Syntrak — Engineering & Code Review Console</title>
+  
+  <!-- Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Icons & Code Styling -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Clean Minimalist Header -->
+    <header class="top-nav">
+      <div class="nav-brand">
+        <div class="brand-badge">
+          <i class="fa-solid fa-code"></i>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Syntrak</span>
+          <span class="brand-sub">Code Intelligence System</span>
+        </div>
+      </div>
+
+      <div class="nav-center">
+        <div class="status-chip" id="modelPill" title="Click to configure model">
+          <span class="chip-label">MODEL</span>
+          <span class="chip-value" id="headerModelName">Loading...</span>
+        </div>
+
+        <div class="status-chip" id="workspacePill" title="Working Directory">
+          <span class="chip-label">WORKSPACE</span>
+          <span class="chip-value" id="headerWorkspace">Workspace</span>
+        </div>
+      </div>
+
+      <div class="nav-actions">
+        <button class="nav-btn" id="btnQuickReview" title="Review current git diff">
+          <i class="fa-solid fa-file-shield"></i> Review Code
+        </button>
+        <button class="nav-btn" id="btnQuickUndo" title="Rollback last agent edit">
+          <i class="fa-solid fa-rotate-left"></i> Undo
+        </button>
+        <button class="nav-btn nav-btn-icon" id="btnSettings" title="Model & Settings">
+          <i class="fa-solid fa-gear"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="workspace-body">
+      <!-- Chat Stage -->
+      <section class="stage-chat">
+        <div class="chat-viewport" id="chatMessages">
+          <!-- Institutional Welcome Card -->
+          <div class="welcome-panel">
+            <div class="welcome-header">
+              <h2>Autonomous Code Assistant & Reviewer</h2>
+              <p>Specialized in code review, architecture analysis, bug fixing, and test generation using open-source models.</p>
+            </div>
+
+            <div class="quick-action-grid">
+              <div class="action-card" onclick="sendQuickPrompt('/review')">
+                <div class="card-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                <div class="card-text">
+                  <strong>/review</strong>
+                  <span>Audit current working diff for bugs, edge cases, and security vulnerabilities</span>
+                </div>
+              </div>
+
+              <div class="action-card" onclick="sendQuickPrompt('Analyze repository structure and list core modules')">
+                <div class="card-icon"><i class="fa-solid fa-diagram-project"></i></div>
+                <div class="card-text">
+                  <strong>Analyze Architecture</strong>
+                  <span>Inspect module hierarchy and system dependencies</span>
+                </div>
+              </div>
+
+              <div class="action-card" onclick="sendQuickPrompt('Write unit tests for core agent tools and verify with pytest')">
+                <div class="card-icon"><i class="fa-solid fa-vial-circle-check"></i></div>
+                <div class="card-text">
+                  <strong>Generate Unit Tests</strong>
+                  <span>Create comprehensive test coverage and run validation</span>
+                </div>
+              </div>
+
+              <div class="action-card" onclick="sendQuickPrompt('Check for potential security vulnerabilities or input sanitization issues')">
+                <div class="card-icon"><i class="fa-solid fa-lock"></i></div>
+                <div class="card-text">
+                  <strong>Security Audit</strong>
+                  <span>Scan project for credential leaks and input sanitization gaps</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Input Console -->
+        <div class="console-dock">
+          <div class="slash-dropdown" id="slashPopup">
+            <div class="slash-header">Slash Commands</div>
+            <div class="slash-row" data-cmd="/review">
+              <span class="s-cmd">/review</span>
+              <span class="s-desc">Run automated code review on current diff</span>
+            </div>
+            <div class="slash-row" data-cmd="/commit">
+              <span class="s-cmd">/commit</span>
+              <span class="s-desc">Generate Conventional Commit message & commit</span>
+            </div>
+            <div class="slash-row" data-cmd="/undo">
+              <span class="s-cmd">/undo</span>
+              <span class="s-desc">Rollback to previous git snapshot</span>
+            </div>
+            <div class="slash-row" data-cmd="/clear">
+              <span class="s-cmd">/clear</span>
+              <span class="s-desc">Reset conversation memory</span>
+            </div>
+          </div>
+
+          <form class="console-form" id="chatForm" onsubmit="event.preventDefault(); return false;">
+            <textarea
+              id="promptInput"
+              placeholder="Ask a question, request code modifications, or type '/' for slash commands..."
+              rows="1"
+            ></textarea>
+
+            <div class="console-controls">
+              <button type="button" class="btn-ctrl btn-ctrl-clear" id="btnClearChat" title="Clear Chat">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+              <button type="button" class="btn-ctrl btn-ctrl-send" id="btnSend" title="Send (Enter)">
+                <i class="fa-solid fa-arrow-up"></i>
+              </button>
+              <button type="button" class="btn-ctrl btn-ctrl-stop hidden" id="btnStop" title="Stop Generation">
+                <i class="fa-solid fa-stop"></i>
+              </button>
+            </div>
+          </form>
+
+          <div class="console-shortcuts">
+            <span>Press <strong>Enter</strong> to send &bull; <strong>Shift+Enter</strong> for newline &bull; <strong>/</strong> for slash commands</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sidebar Inspector -->
+      <aside class="sidebar-dock">
+        <div class="dock-nav">
+          <button class="dtab-btn active" data-tab="tabReview">
+            <i class="fa-solid fa-clipboard-check"></i> Code Review
+          </button>
+          <button class="dtab-btn" data-tab="tabConfig">
+            <i class="fa-solid fa-sliders"></i> Settings
+          </button>
+        </div>
+
+        <div class="dock-content">
+          <!-- Review Tab -->
+          <div class="dpanel active" id="tabReview">
+            <div class="dpanel-head">
+              <span>Code Audit & Review</span>
+              <button class="btn-accent-sm" onclick="sendQuickPrompt('/review')">
+                <i class="fa-solid fa-play"></i> Run Review
+              </button>
+            </div>
+            <div class="review-box" id="reviewOutput">
+              <div class="empty-state">
+                <i class="fa-solid fa-clipboard-list"></i>
+                <p>Run a code review to automatically verify code quality, edge cases, and security practices.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Settings Tab -->
+          <div class="dpanel" id="tabConfig">
+            <div class="dpanel-head">
+              <span>LLM Configuration</span>
+            </div>
+
+            <form class="config-stack" id="configForm">
+              <div class="form-row">
+                <label>Model Name</label>
+                <input type="text" id="cfgModel" placeholder="e.g. openai/meta/llama-3.1-8b-instruct or ollama/qwen2.5-coder:latest" required>
+              </div>
+              <div class="form-row">
+                <label>API Base URL</label>
+                <input type="text" id="cfgApiBase" placeholder="e.g. https://integrate.api.nvidia.com/v1">
+              </div>
+              <div class="form-row">
+                <label>API Key</label>
+                <input type="password" id="cfgApiKey" placeholder="API key (if applicable)">
+              </div>
+              <button type="submit" class="btn-submit">
+                Save & Apply Settings
+              </button>
+            </form>
+
+            <div class="presets-block">
+              <span class="block-title">Common Provider Presets</span>
+              <div class="preset-list">
+                <button class="preset-item" onclick="applyPreset('ollama/qwen2.5-coder:latest', 'http://localhost:11434', '')">
+                  <strong>Ollama Qwen 2.5 Coder</strong>
+                  <span>http://localhost:11434</span>
+                </button>
+                <button class="preset-item" onclick="applyPreset('openai/meta/llama-3.1-8b-instruct', 'https://integrate.api.nvidia.com/v1', '')">
+                  <strong>NVIDIA Llama 3.1 8B</strong>
+                  <span>NVIDIA NIM Endpoint</span>
+                </button>
+                <button class="preset-item" onclick="applyPreset('openai/deepseek-ai/deepseek-r1', 'https://integrate.api.nvidia.com/v1', '')">
+                  <strong>DeepSeek-R1</strong>
+                  <span>Reasoning Endpoint</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div class="toast-stack" id="toastContainer"></div>
+
+  <!-- Scripts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

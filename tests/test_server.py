@@ -2,13 +2,13 @@
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from campuscli.server.app import create_app
-from campuscli.config import CampusConfig
+from syntrak.server.app import create_app
+from syntrak.config import SyntrakConfig
 
 
 @pytest.mark.asyncio
 async def test_session_status_and_model_switch():
-    cfg = CampusConfig()
+    cfg = SyntrakConfig()
     app = create_app(config=cfg)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

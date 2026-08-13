@@ -1,4 +1,4 @@
-"""Base interface for LLM clients in CampusCLI."""
+"""Base interface for LLM clients in Syntrak."""
 
 from abc import ABC, abstractmethod
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple

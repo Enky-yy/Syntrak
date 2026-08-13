@@ -1,4 +1,4 @@
-"""Base tool definitions and tool registry for CampusCLI."""
+"""Base tool definitions and tool registry for Syntrak."""
 
 import inspect
 import json

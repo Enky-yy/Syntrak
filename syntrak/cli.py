@@ -1,19 +1,19 @@
-"""Main CLI entrypoint for CampusCLI using Typer."""
+"""Main CLI entrypoint for Syntrak using Typer."""
 
 import asyncio
 from typing import Optional
 import typer
 import uvicorn
 
-from campuscli.config import CampusConfig
-from campuscli.core.session import SessionManager
-from campuscli.tools.git_ops import git_diff
-from campuscli.ui.commands import execute_and_stream
-from campuscli.ui.renderer import console, render_diff
-from campuscli.ui.repl import start_repl
+from syntrak.config import SyntrakConfig
+from syntrak.core.session import SessionManager
+from syntrak.tools.git_ops import git_diff
+from syntrak.ui.commands import execute_and_stream
+from syntrak.ui.renderer import console, render_diff
+from syntrak.ui.repl import start_repl
 
 app = typer.Typer(
-    name="campuscli",
+    name="syntrak",
     help="Terminal-based & web-ready open-source code reviewer and writer assistant.",
     no_args_is_help=False
 )
@@ -28,7 +28,7 @@ def main_callback(
 ):
     """Start interactive REPL by default if no subcommand is passed."""
     if ctx.invoked_subcommand is None:
-        cfg = CampusConfig.load()
+        cfg = SyntrakConfig.load()
         if model:
             cfg.llm.model = model
         if api_base:
@@ -47,7 +47,7 @@ def run_command(
     api_base: Optional[str] = typer.Option(None, "--api-base", help="Custom API Base URL"),
 ):
     """Run a single prompt/task non-interactively."""
-    cfg = CampusConfig.load()
+    cfg = SyntrakConfig.load()
     if model:
         cfg.llm.model = model
     if api_base:
@@ -64,7 +64,7 @@ def review_command(
     model: Optional[str] = typer.Option(None, "--model", "-m", help="LLM model to use"),
 ):
     """Perform automated code review on current diff."""
-    cfg = CampusConfig.load()
+    cfg = SyntrakConfig.load()
     if model:
         cfg.llm.model = model
 
@@ -94,14 +94,14 @@ def serve_command(
     reload: bool = typer.Option(False, "--reload", help="Enable auto-reload for dev"),
 ):
     """Launch the Web API server (SSE / REST) to connect a Web UI."""
-    console.print(f"[bold cyan]🚀 Starting CampusCLI Web API server on http://{host}:{port}[/bold cyan]")
-    uvicorn.run("campuscli.server.app:app", host=host, port=port, reload=reload)
+    console.print(f"[bold cyan]🚀 Starting Syntrak Web API server on http://{host}:{port}[/bold cyan]")
+    uvicorn.run("syntrak.server.app:app", host=host, port=port, reload=reload)
 
 
 @app.command(name="init")
 def init_config():
-    """Create default global config file (~/.campuscli/config.yaml)."""
-    cfg = CampusConfig()
+    """Create default global config file (~/.syntrak/config.yaml)."""
+    cfg = SyntrakConfig()
     dest = cfg.save_global()
     console.print(f"[success]Created global config at:[/] [bold green]{dest}[/]")
 

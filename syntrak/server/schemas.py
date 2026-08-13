@@ -1,4 +1,4 @@
-"""Pydantic schemas for the CampusCLI Web API server."""
+"""Pydantic schemas for the Syntrak Web API server."""
 
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field

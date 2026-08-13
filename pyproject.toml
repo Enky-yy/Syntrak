@@ -3,14 +3,14 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "campuscli"
+name = "syntrak"
 version = "0.1.0"
 description = "Terminal-based and web-ready open-source code reviewer and writer assistant"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
-    { name = "CampusCLI Team" }
+    { name = "Syntrak Team" }
 ]
 dependencies = [
     "litellm>=1.40.0",
@@ -29,7 +29,11 @@ dependencies = [
 ]
 
 [project.scripts]
-campuscli = "campuscli.cli:app"
+syntrak = "syntrak.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["syntrak*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

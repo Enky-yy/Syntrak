@@ -1,4 +1,4 @@
-"""Event definitions for CampusCLI streaming and UI/Web updates."""
+"""Event definitions for Syntrak streaming and UI/Web updates."""
 
 from enum import Enum
 from typing import Any, Dict, List, Optional

@@ -3,9 +3,9 @@
 import os
 from typing import Any, AsyncGenerator, Dict, List, Optional
 import litellm
-from campuscli.config import LLMConfig
-from campuscli.llm.base import BaseLLMClient, LLMResponseChunk
-from campuscli.llm.parser import parse_markdown_tool_calls, parse_xml_tool_calls
+from syntrak.config import LLMConfig
+from syntrak.llm.base import BaseLLMClient, LLMResponseChunk
+from syntrak.llm.parser import parse_markdown_tool_calls, parse_xml_tool_calls
 
 
 # Disable verbose litellm logs

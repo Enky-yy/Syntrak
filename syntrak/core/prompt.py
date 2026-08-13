@@ -1,12 +1,12 @@
-"""System prompt definitions and prompt assembly for CampusCLI."""
+"""System prompt definitions and prompt assembly for Syntrak."""
 
 from typing import List, Optional
-from campuscli.config import CampusConfig
-from campuscli.core.context import build_repo_map
-from campuscli.tools.base import ToolRegistry
+from syntrak.config import SyntrakConfig
+from syntrak.core.context import build_repo_map
+from syntrak.tools.base import ToolRegistry
 
 
-BASE_SYSTEM_PROMPT = """You are CampusCLI, an expert, highly capable software engineering assistant and code reviewer.
+BASE_SYSTEM_PROMPT = """You are Syntrak, an expert, highly capable software engineering assistant and code reviewer.
 You operate directly inside the user's repository, providing precise code review, debugging, refactoring, test writing, and feature development.
 
 ### CORE OPERATING PRINCIPLES:
@@ -43,7 +43,7 @@ You can provide explanation before or after calling a tool. Once the tool finish
 
 
 def build_system_prompt(
-    config: CampusConfig,
+    config: SyntrakConfig,
     registry: ToolRegistry,
     custom_instructions: Optional[str] = None
 ) -> str:

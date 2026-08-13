@@ -1,4 +1,4 @@
-"""FastAPI server exposing CampusCLI core engine for Web frontends."""
+"""FastAPI server exposing Syntrak core engine for Web frontends."""
 
 import json
 from pathlib import Path
@@ -8,22 +8,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from campuscli.config import CampusConfig
-from campuscli.core.session import SessionManager
-from campuscli.server.schemas import (
+from syntrak.config import SyntrakConfig
+from syntrak.core.session import SessionManager
+from syntrak.server.schemas import (
     ChatRequest,
     ReviewRequest,
     SessionInfoResponse,
     SwitchModelRequest,
 )
-from campuscli.tools.git_ops import git_diff, git_status
+from syntrak.tools.git_ops import git_diff, git_status
 
 
-def create_app(config: CampusConfig = None) -> FastAPI:
+def create_app(config: SyntrakConfig = None) -> FastAPI:
     """Create and configure FastAPI application for Web UI."""
     app = FastAPI(
-        title="CampusCLI API & Web UI",
-        description="REST & SSE Streaming API and Web Dashboard for CampusCLI",
+        title="Syntrak API & Web UI",
+        description="REST & SSE Streaming API and Web Dashboard for Syntrak",
         version="0.1.0"
     )
 
@@ -43,7 +43,7 @@ def create_app(config: CampusConfig = None) -> FastAPI:
 
         @app.get("/")
         async def serve_index():
-            """Serve CampusCLI Web Dashboard."""
+            """Serve Syntrak Web Dashboard."""
             return FileResponse(str(static_dir / "index.html"))
 
     @app.get("/api/session/status", response_model=SessionInfoResponse)

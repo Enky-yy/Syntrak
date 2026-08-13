@@ -1,4 +1,4 @@
-"""Configuration management for CampusCLI."""
+"""Configuration management for Syntrak."""
 
 import os
 from pathlib import Path
@@ -65,8 +65,8 @@ class ReviewConfig(BaseModel):
     strictness: str = Field(default="medium", description="low | medium | high | strict")
 
 
-class CampusConfig(BaseSettings):
-    """Main CampusCLI configuration."""
+class SyntrakConfig(BaseSettings):
+    """Main Syntrak configuration."""
     model_config = SettingsConfigDict(
         env_prefix="CAMPUSCLI_",
         env_nested_delimiter="__",
@@ -83,12 +83,12 @@ class CampusConfig(BaseSettings):
     workspace_root: str = Field(default_factory=os.getcwd)
 
     @classmethod
-    def load(cls, config_path: Optional[str] = None) -> "CampusConfig":
-        """Load config from ~/.campuscli/config.yaml, local .campusclirc.yaml, or path."""
+    def load(cls, config_path: Optional[str] = None) -> "SyntrakConfig":
+        """Load config from ~/.syntrak/config.yaml, local .syntrakrc.yaml, or path."""
         data: Dict[str, Any] = {}
 
-        global_path = Path.home() / ".campuscli" / "config.yaml"
-        local_path = Path.cwd() / ".campusclirc.yaml"
+        global_path = Path.home() / ".syntrak" / "config.yaml"
+        local_path = Path.cwd() / ".syntrakrc.yaml"
 
         paths_to_check = []
         if config_path:
@@ -116,8 +116,8 @@ class CampusConfig(BaseSettings):
         return cls(**data)
 
     def save_global(self) -> Path:
-        """Save current config to global ~/.campuscli/config.yaml."""
-        dest = Path.home() / ".campuscli" / "config.yaml"
+        """Save current config to global ~/.syntrak/config.yaml."""
+        dest = Path.home() / ".syntrak" / "config.yaml"
         dest.parent.mkdir(parents=True, exist_ok=True)
         with open(dest, "w", encoding="utf-8") as f:
             yaml.dump(self.model_dump(), f, default_flow_style=False)

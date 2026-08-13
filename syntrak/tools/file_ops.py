@@ -1,10 +1,10 @@
-"""File system operations for CampusCLI."""
+"""File system operations for Syntrak."""
 
 import os
 import re
 from pathlib import Path
 from typing import Dict, List, Optional
-from campuscli.tools.base import default_registry
+from syntrak.tools.base import default_registry
 
 
 @default_registry.register(

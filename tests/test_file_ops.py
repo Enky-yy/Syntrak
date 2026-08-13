@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 import pytest
-from campuscli.tools.file_ops import (
+from syntrak.tools.file_ops import (
     list_directory,
     read_file,
     replace_in_file,
@@ -43,12 +43,12 @@ def test_replace_in_file(tmp_path: Path):
 
 def test_list_and_search_files(tmp_path: Path):
     (tmp_path / "subdir").mkdir()
-    write_file(str(tmp_path / "file1.txt"), "CampusCLI open source model test")
+    write_file(str(tmp_path / "file1.txt"), "Syntrak open source model test")
     write_file(str(tmp_path / "subdir" / "file2.txt"), "another piece of text")
 
     list_res = list_directory(str(tmp_path), recursive=True)
     assert "file1.txt" in list_res
     assert "subdir" in list_res
 
-    search_res = search_files(query="CampusCLI", dir_path=str(tmp_path))
+    search_res = search_files(query="Syntrak", dir_path=str(tmp_path))
     assert "file1.txt" in search_res

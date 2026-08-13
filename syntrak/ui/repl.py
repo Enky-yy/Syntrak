@@ -1,4 +1,4 @@
-"""Interactive Prompt Toolkit REPL for CampusCLI."""
+"""Interactive Prompt Toolkit REPL for Syntrak."""
 
 import asyncio
 from pathlib import Path
@@ -9,9 +9,9 @@ from prompt_toolkit.completion import Completer, Completion, PathCompleter
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.styles import Style
 
-from campuscli.core.session import SessionManager
-from campuscli.ui.commands import execute_and_stream, handle_slash_command
-from campuscli.ui.renderer import console, print_banner
+from syntrak.core.session import SessionManager
+from syntrak.ui.commands import execute_and_stream, handle_slash_command
+from syntrak.ui.renderer import console, print_banner
 
 
 SLASH_COMMANDS = [
@@ -51,11 +51,11 @@ class CampusCompleter(Completer):
 
 
 async def start_repl(session: Optional[SessionManager] = None):
-    """Run interactive CampusCLI REPL session."""
+    """Run interactive Syntrak REPL session."""
     if session is None:
         session = SessionManager()
 
-    history_file = Path.home() / ".campuscli" / "history"
+    history_file = Path.home() / ".syntrak" / "history"
     history_file.parent.mkdir(parents=True, exist_ok=True)
 
     prompt_session = PromptSession(

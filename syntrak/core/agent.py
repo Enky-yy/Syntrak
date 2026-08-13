@@ -1,8 +1,8 @@
-"""ReAct Agent Loop with streaming event architecture for CampusCLI."""
+"""ReAct Agent Loop with streaming event architecture for Syntrak."""
 
 import json
 from typing import Any, AsyncGenerator, Dict, List, Optional
-from campuscli.core.events import (
+from syntrak.core.events import (
     AgentStatusEvent,
     BaseEvent,
     DoneEvent,
@@ -12,9 +12,9 @@ from campuscli.core.events import (
     ToolResultEvent,
     ToolStartEvent,
 )
-from campuscli.core.memory import MemoryManager
-from campuscli.llm.base import BaseLLMClient
-from campuscli.tools.base import ToolRegistry
+from syntrak.core.memory import MemoryManager
+from syntrak.llm.base import BaseLLMClient
+from syntrak.tools.base import ToolRegistry
 
 
 class AgentRunner:

@@ -1,4 +1,4 @@
-"""Repository context and file tree mapper for CampusCLI."""
+"""Repository context and file tree mapper for Syntrak."""
 
 import os
 from pathlib import Path

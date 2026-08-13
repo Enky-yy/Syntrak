@@ -2,24 +2,24 @@
 
 import subprocess
 from typing import AsyncGenerator, Dict, List, Optional
-from campuscli.config import CampusConfig
-from campuscli.core.agent import AgentRunner
-from campuscli.core.events import BaseEvent
-from campuscli.core.memory import MemoryManager
-from campuscli.core.prompt import build_system_prompt
-from campuscli.llm.litellm_client import LiteLLMClient
-from campuscli.tools.base import ToolRegistry, default_registry
-import campuscli.tools.file_ops  # noqa: F401 - register tools
-import campuscli.tools.bash_ops  # noqa: F401 - register tools
-import campuscli.tools.git_ops   # noqa: F401 - register tools
-import campuscli.tools.review_ops # noqa: F401 - register tools
+from syntrak.config import SyntrakConfig
+from syntrak.core.agent import AgentRunner
+from syntrak.core.events import BaseEvent
+from syntrak.core.memory import MemoryManager
+from syntrak.core.prompt import build_system_prompt
+from syntrak.llm.litellm_client import LiteLLMClient
+from syntrak.tools.base import ToolRegistry, default_registry
+import syntrak.tools.file_ops  # noqa: F401 - register tools
+import syntrak.tools.bash_ops  # noqa: F401 - register tools
+import syntrak.tools.git_ops   # noqa: F401 - register tools
+import syntrak.tools.review_ops # noqa: F401 - register tools
 
 
 class SessionManager:
-    """Manages an active CampusCLI coding & review session."""
+    """Manages an active Syntrak coding & review session."""
 
-    def __init__(self, config: Optional[CampusConfig] = None):
-        self.config = config or CampusConfig.load()
+    def __init__(self, config: Optional[SyntrakConfig] = None):
+        self.config = config or SyntrakConfig.load()
         self.registry: ToolRegistry = default_registry
         self.memory: MemoryManager = MemoryManager(
             context_limit=self.config.llm.context_window

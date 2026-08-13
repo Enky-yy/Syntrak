@@ -2,11 +2,11 @@
 
 import pytest
 from typing import Any, AsyncGenerator, Dict, List, Optional
-from campuscli.core.agent import AgentRunner
-from campuscli.core.events import DoneEvent, TokenStreamEvent, ToolResultEvent, ToolStartEvent
-from campuscli.core.memory import MemoryManager
-from campuscli.llm.base import BaseLLMClient, LLMResponseChunk
-from campuscli.tools.base import ToolRegistry
+from syntrak.core.agent import AgentRunner
+from syntrak.core.events import DoneEvent, TokenStreamEvent, ToolResultEvent, ToolStartEvent
+from syntrak.core.memory import MemoryManager
+from syntrak.llm.base import BaseLLMClient, LLMResponseChunk
+from syntrak.tools.base import ToolRegistry
 
 
 class MockLLMClient(BaseLLMClient):

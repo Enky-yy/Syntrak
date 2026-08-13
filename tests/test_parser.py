@@ -1,6 +1,6 @@
 """Tests for tool call extraction and parsing."""
 
-from campuscli.llm.parser import parse_markdown_tool_calls, parse_xml_tool_calls
+from syntrak.llm.parser import parse_markdown_tool_calls, parse_xml_tool_calls
 
 
 def test_parse_xml_tool_calls():

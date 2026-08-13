@@ -1,10 +1,10 @@
-"""Bash and command-line execution operations for CampusCLI."""
+"""Bash and command-line execution operations for Syntrak."""
 
 import asyncio
 import os
 import shlex
 from typing import Dict, List, Optional
-from campuscli.tools.base import default_registry
+from syntrak.tools.base import default_registry
 
 
 BLOCKED_PATTERNS = [

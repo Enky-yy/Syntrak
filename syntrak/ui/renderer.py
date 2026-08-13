@@ -1,4 +1,4 @@
-"""Rich terminal renderer for CampusCLI."""
+"""Rich terminal renderer for Syntrak."""
 
 import json
 from typing import Any, Dict, Optional
@@ -24,8 +24,8 @@ console = Console(theme=custom_theme)
 
 
 def print_banner(model_name: str, workspace_root: str):
-    """Print welcoming CampusCLI banner."""
-    content = f"""[bold cyan]CampusCLI[/bold cyan] [dim]v0.1.0[/dim] - Open-Source Agentic Code Reviewer & Assistant
+    """Print welcoming Syntrak banner."""
+    content = f"""[bold cyan]Syntrak[/bold cyan] [dim]v0.1.0[/dim] - Open-Source Agentic Code Reviewer & Assistant
 [dim]Model:[/] [bold green]{model_name}[/] | [dim]Workspace:[/] [yellow]{workspace_root}[/]
 [dim]Type [bold white]/help[/] for slash commands, or ask any coding / review question directly.[/dim]"""
     console.print(Panel(content, border_style="cyan", padding=(0, 1)))
@@ -92,7 +92,7 @@ def render_diff(diff_text: str):
 
 def render_help():
     """Display interactive slash commands guide."""
-    table = Table(title="CampusCLI Commands", border_style="cyan", show_header=True, header_style="bold cyan")
+    table = Table(title="Syntrak Commands", border_style="cyan", show_header=True, header_style="bold cyan")
     table.add_column("Command", style="bold white", width=18)
     table.add_column("Description", style="dim")
 
@@ -105,6 +105,6 @@ def render_help():
     table.add_row("/compact", "Manually compact and summarize chat history")
     table.add_row("/config", "Print active configuration & endpoint settings")
     table.add_row("/help", "Show this help table")
-    table.add_row("/exit, /quit", "Exit the CampusCLI interactive session")
+    table.add_row("/exit, /quit", "Exit the Syntrak interactive session")
 
     console.print(table)

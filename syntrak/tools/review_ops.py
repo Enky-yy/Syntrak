@@ -1,9 +1,9 @@
-"""Code review analysis tools for CampusCLI."""
+"""Code review analysis tools for Syntrak."""
 
 import re
 from typing import Any, Dict, List, Optional
-from campuscli.tools.base import default_registry
-from campuscli.tools.git_ops import git_diff
+from syntrak.tools.base import default_registry
+from syntrak.tools.git_ops import git_diff
 
 
 @default_registry.register(

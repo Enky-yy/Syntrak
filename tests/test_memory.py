@@ -1,6 +1,6 @@
 """Tests for conversation memory management and compaction."""
 
-from campuscli.core.memory import MemoryManager, estimate_tokens
+from syntrak.core.memory import MemoryManager, estimate_tokens
 
 
 def test_estimate_tokens():
@@ -13,7 +13,7 @@ def test_memory_compaction():
     # Set a small context limit to trigger compaction quickly
     mem = MemoryManager(context_limit=100, target_ratio=0.5)
 
-    mem.add_message("system", "You are CampusCLI.")
+    mem.add_message("system", "You are Syntrak.")
     for i in range(10):
         mem.add_message("user", f"Here is query number {i} with some long text to fill up the context window.")
         mem.add_message("assistant", f"Here is response number {i} explaining the solution.")

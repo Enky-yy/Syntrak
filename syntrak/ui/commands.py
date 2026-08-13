@@ -1,7 +1,7 @@
 """Slash command handler for interactive REPL session."""
 
 from typing import Optional, Tuple
-from campuscli.core.events import (
+from syntrak.core.events import (
     AgentStatusEvent,
     DoneEvent,
     ErrorEvent,
@@ -10,9 +10,9 @@ from campuscli.core.events import (
     ToolResultEvent,
     ToolStartEvent,
 )
-from campuscli.core.session import SessionManager
-from campuscli.tools.git_ops import git_diff
-from campuscli.ui.renderer import (
+from syntrak.core.session import SessionManager
+from syntrak.tools.git_ops import git_diff
+from syntrak.ui.renderer import (
     console,
     render_diff,
     render_help,
@@ -29,7 +29,7 @@ async def handle_slash_command(command_str: str, session: SessionManager) -> boo
     arg = parts[1] if len(parts) > 1 else ""
 
     if cmd in ("/exit", "/quit"):
-        console.print("[yellow]Exiting CampusCLI session. Happy coding![/yellow]")
+        console.print("[yellow]Exiting Syntrak session. Happy coding![/yellow]")
         return True
 
     elif cmd == "/help":
