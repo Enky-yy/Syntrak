@@ -35,6 +35,9 @@ syntrak = "syntrak.cli:app"
 where = ["."]
 include = ["syntrak*"]
 
+[tool.setuptools.package-data]
+"syntrak.server" = ["static/*", "static/**/*"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

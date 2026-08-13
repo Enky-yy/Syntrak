@@ -28,3 +28,8 @@ async def test_session_status_and_model_switch():
         diff_res = await client.get("/api/diff")
         assert diff_res.status_code == 200
         assert "diff" in diff_res.json()
+
+        # Test web frontend UI endpoint
+        index_res = await client.get("/")
+        assert index_res.status_code == 200
+        assert "syntrak.nvim" in index_res.text
