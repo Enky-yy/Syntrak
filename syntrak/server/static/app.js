@@ -1,5 +1,5 @@
 /**
- * Syntrak Web UI Client Logic
+ * syntrak.nvim — Web UI Client Logic
  */
 
 let activeAbortController = null;
@@ -15,18 +15,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('btnQuickUndo')?.addEventListener('click', handleUndo);
   document.getElementById('btnClearChat')?.addEventListener('click', clearChat);
-  document.getElementById('btnSettings')?.addEventListener('click', () => {
-    switchTab('tabConfig');
-  });
-  document.getElementById('modelPill')?.addEventListener('click', () => {
-    switchTab('tabConfig');
-  });
   document.getElementById('configForm')?.addEventListener('submit', handleConfigSave);
 });
 
-/* Tab Navigation */
+/* Tab Navigation (Buffer switching) */
 function initTabs() {
-  const tabBtns = document.querySelectorAll('.dtab-btn');
+  const tabBtns = document.querySelectorAll('.buffer-tab');
   tabBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       const tabId = btn.getAttribute('data-tab');
@@ -36,14 +30,19 @@ function initTabs() {
 }
 
 function switchTab(tabId) {
-  document.querySelectorAll('.dtab-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.dpanel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.buffer-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.window-pane').forEach(p => p.classList.remove('active'));
 
-  const activeBtn = document.querySelector(`.dtab-btn[data-tab="${tabId}"]`);
+  const activeBtn = document.querySelector(`.buffer-tab[data-tab="${tabId}"]`);
   const activePanel = document.getElementById(tabId);
 
   if (activeBtn) activeBtn.classList.add('active');
   if (activePanel) activePanel.classList.add('active');
+
+  const activeBufLabel = document.getElementById('stlActiveBuffer');
+  if (activeBufLabel && activeBtn) {
+    activeBufLabel.textContent = activeBtn.querySelector('.tab-name')?.textContent || 'buffer';
+  }
 }
 
 /* Load Session Metadata */
@@ -53,8 +52,9 @@ async function loadSessionStatus() {
     if (!res.ok) return;
     const data = await res.json();
 
-    document.getElementById('headerModelName').textContent = data.model || 'Unknown';
-    document.getElementById('headerWorkspace').textContent = data.workspace_root.split('/').pop() || 'Workspace';
+    const shortModel = (data.model || 'Unknown').split('/').pop();
+    document.getElementById('headerModelName').textContent = shortModel;
+    document.getElementById('headerWorkspace').textContent = data.workspace_root.split('/').pop() || 'main';
     document.getElementById('cfgModel').value = data.model || '';
     document.getElementById('cfgApiBase').value = data.api_base || '';
   } catch (err) {
@@ -88,11 +88,11 @@ async function handleConfigSave(e) {
     });
     const data = await res.json();
     if (data.status === 'success') {
-      showToast(`Switched model to ${data.active_model}`);
+      showToast(`:w config saved. Active model: ${data.active_model}`);
       loadSessionStatus();
     }
   } catch (err) {
-    showToast(`Failed to switch model: ${err.message}`, 'error');
+    showToast(`Config error: ${err.message}`, 'error');
   }
 }
 
@@ -111,7 +111,7 @@ function initChatForm() {
 
   input.addEventListener('input', () => {
     input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 180) + 'px';
+    input.style.height = Math.min(input.scrollHeight, 160) + 'px';
   });
 
   function submitCurrentInput() {
@@ -122,13 +122,20 @@ function initChatForm() {
     input.style.height = 'auto';
     hideSlashPopup();
 
-    if (query === '/clear') {
+    if (query === '/clear' || query === ':clear') {
       clearChat();
       return;
     }
-    if (query === '/undo') {
+    if (query === '/undo' || query === ':undo') {
       handleUndo();
       return;
+    }
+    if (query === ':w' || query === ':config') {
+      switchTab('tabConfig');
+      return;
+    }
+    if (query === ':Review' || query === '/review') {
+      switchTab('tabChat');
     }
 
     runQueryStream(query);
@@ -165,11 +172,10 @@ function initChatForm() {
 function sendQuickPrompt(promptText) {
   const input = document.getElementById('promptInput');
   if (input) {
+    switchTab('tabChat');
     input.value = promptText;
     const btnSend = document.getElementById('btnSend');
-    if (btnSend) {
-      btnSend.click();
-    }
+    if (btnSend) btnSend.click();
   }
 }
 
@@ -227,7 +233,7 @@ async function runQueryStream(query) {
     }
   } catch (err) {
     if (err.name === 'AbortError') {
-      appendSystemNote(contentEl, 'Generation stopped by user.');
+      appendSystemNote(contentEl, '-- Interrupted by user --');
     } else {
       appendSystemNote(contentEl, `Error: ${err.message}`, 'error');
     }
@@ -250,12 +256,16 @@ function handleAgentEvent(event, contentEl, accumulatedMd, setMdCallback) {
       contentEl.textContent = newMd;
     }
 
-    addCopyButtonsAndHighlight(contentEl);
+    if (window.Prism) {
+      contentEl.querySelectorAll('pre code').forEach((block) => {
+        Prism.highlightElement(block);
+      });
+    }
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
   } else if (event.event_type === 'agent_status') {
-    const typingSpan = contentEl.querySelector('.cursor-typing');
-    if (typingSpan && event.step > 1) {
-      typingSpan.textContent = `Executing step ${event.step}...`;
+    const statusSpan = contentEl.querySelector('.cursor-typing');
+    if (statusSpan && event.step > 1) {
+      statusSpan.textContent = `[step ${event.step}/25] executing...`;
     }
   } else if (event.event_type === 'tool_start') {
     const card = document.createElement('div');
@@ -263,7 +273,8 @@ function handleAgentEvent(event, contentEl, accumulatedMd, setMdCallback) {
     card.id = `tool-${event.tool_id}`;
     card.innerHTML = `
       <div class="tool-card-header">
-        <span><i class="fa-solid fa-gear fa-spin"></i> Tool Executing: ${event.tool_name}</span>
+        <span> tool: ${event.tool_name}</span>
+        <span>[RUNNING]</span>
       </div>
       <div class="tool-card-body">${escapeHtml(JSON.stringify(event.arguments, null, 2))}</div>
     `;
@@ -274,7 +285,8 @@ function handleAgentEvent(event, contentEl, accumulatedMd, setMdCallback) {
     if (card) {
       card.classList.add(event.success ? 'tool-result-success' : 'tool-result-error');
       card.querySelector('.tool-card-header').innerHTML = `
-        <span><i class="fa-solid fa-check"></i> ${event.tool_name} Completed</span>
+        <span> tool: ${event.tool_name}</span>
+        <span>[${event.success ? 'OK' : 'ERR'}]</span>
       `;
       card.querySelector('.tool-card-body').textContent = String(event.output || event.error);
     }
@@ -289,7 +301,11 @@ function appendUserMessage(text) {
   const msg = document.createElement('div');
   msg.className = 'message user-message';
   msg.innerHTML = `
-    <div class="message-avatar"><i class="fa-solid fa-user"></i></div>
+    <div class="user-prompt-badge">
+      <span class="user-host">❯ enky@syntrak</span>
+      <span class="user-branch">(main )</span>
+      <span>$</span>
+    </div>
     <div class="message-content"><p>${escapeHtml(text)}</p></div>
   `;
   container.appendChild(msg);
@@ -301,8 +317,11 @@ function createAssistantMessageElement() {
   const msg = document.createElement('div');
   msg.className = 'message assistant-message';
   msg.innerHTML = `
-    <div class="message-avatar"><i class="fa-solid fa-robot"></i></div>
-    <div class="message-content"><span class="cursor-typing"><i class="fa-solid fa-circle-notch fa-spin"></i> Thinking...</span></div>
+    <div class="user-prompt-badge">
+      <span style="color: var(--color-blue)">󰚩 syntrak[agent]</span>
+      <span style="color: var(--text-dim)">&gt;</span>
+    </div>
+    <div class="message-content"><span class="cursor-typing">⠋ thinking...</span></div>
   `;
   container.appendChild(msg);
   container.scrollTop = container.scrollHeight;
@@ -311,32 +330,20 @@ function createAssistantMessageElement() {
 
 function appendSystemNote(contentEl, text, type = 'info') {
   const note = document.createElement('div');
-  note.style.color = type === 'error' ? 'var(--error)' : 'var(--text-muted)';
-  note.style.fontSize = '0.82rem';
-  note.style.marginTop = '0.5rem';
-  note.innerHTML = `<i class="fa-solid fa-circle-info"></i> ${escapeHtml(text)}`;
+  note.style.color = type === 'error' ? 'var(--color-red)' : 'var(--text-dim)';
+  note.style.fontSize = '12px';
+  note.style.marginTop = '6px';
+  note.textContent = text;
   contentEl.appendChild(note);
-}
-
-function addCopyButtonsAndHighlight(container) {
-  if (window.Prism) {
-    container.querySelectorAll('pre code').forEach((block) => {
-      Prism.highlightElement(block);
-    });
-  }
 }
 
 function clearChat() {
   const container = document.getElementById('chatMessages');
   container.innerHTML = `
-    <div class="hero-card">
-      <div class="hero-glow"></div>
-      <div class="hero-header">
-        <div class="hero-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
-        <div>
-          <h2>Session Reset</h2>
-          <p>Memory cleared. Ask any new question or click a quick action below.</p>
-        </div>
+    <div class="nvim-splash">
+      <div class="splash-meta">
+        <span>-- Buffer Cleared (:clear) --</span>
+        <span>Memory reset. Ready for new input.</span>
       </div>
     </div>
   `;
@@ -349,7 +356,7 @@ function initSlashPopup() {
   const popup = document.getElementById('slashPopup');
 
   input.addEventListener('input', () => {
-    if (input.value === '/') {
+    if (input.value === '/' || input.value === ':') {
       popup.style.display = 'flex';
     } else {
       popup.style.display = 'none';
@@ -375,13 +382,29 @@ function hideSlashPopup() {
 function setGeneratingState(isGenerating) {
   const btnSend = document.getElementById('btnSend');
   const btnStop = document.getElementById('btnStop');
+  const stlMode = document.getElementById('stlMode');
+  const stlArrow1 = document.querySelector('.stl-arrow-1');
 
   if (isGenerating) {
     btnSend?.classList.add('hidden');
     btnStop?.classList.remove('hidden');
+    if (stlMode) {
+      stlMode.textContent = 'EXEC';
+      stlMode.className = 'stl-mode exec';
+    }
+    if (stlArrow1) {
+      stlArrow1.className = 'stl-arrow-1 exec';
+    }
   } else {
     btnSend?.classList.remove('hidden');
     btnStop?.classList.add('hidden');
+    if (stlMode) {
+      stlMode.textContent = 'NORMAL';
+      stlMode.className = 'stl-mode';
+    }
+    if (stlArrow1) {
+      stlArrow1.className = 'stl-arrow-1';
+    }
   }
 }
 
@@ -391,7 +414,7 @@ function showToast(message, type = 'info') {
 
   const toast = document.createElement('div');
   toast.className = 'toast-msg';
-  toast.innerHTML = `<i class="fa-solid ${type === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-check'}"></i> ${escapeHtml(message)}`;
+  toast.textContent = message;
   container.appendChild(toast);
 
   setTimeout(() => {
