@@ -7,7 +7,7 @@
 
 ## 📐 System Architecture Overview
 
-Syntrak is designed with a decoupled, event-driven architecture that separates the **LLM reasoning engine** from **tool execution** and the **presentation layer** (Terminal REPL & Web Console).
+Syntrak is designed with a decoupled, event-driven architecture that separates the **LLM reasoning engine** from **tool execution**, **session persistence / auth**, and the **presentation layer** (Terminal REPL & Web Console).
 
 ```mermaid
 flowchart TD
@@ -15,15 +15,23 @@ flowchart TD
         CLI["CLI Commands (syntrak run / review)"]
         REPL["Terminal REPL (prompt_toolkit + rich)"]
         WebUI["Web Console (syntrak.nvim / HTML5 + SSE)"]
+        GoogleGIS["Google Identity Services Button"]
+        Sidebar["ChatGPT-Style Chat History Sidebar"]
     end
 
-    subgraph Server_Layer["2. Gateway & API Server"]
-        FastAPI["FastAPI Server (syntrak.server)"]
+    subgraph Server_Layer["2. Gateway, Auth & API Server"]
+        FastAPI["FastAPI Server (syntrak.server.app)"]
+        AuthService["Auth & JWT Service (syntrak.server.auth)"]
         SSE["SSE Event Streamer (/api/chat/stream)"]
-        REST["REST API Endpoints (model / status / diff / undo)"]
+        REST["REST API (conversations / model / status / diff / undo)"]
     end
 
-    subgraph Core_Engine["3. Core Orchestration Engine"]
+    subgraph Persistence_Layer["3. Persistence & Secret Layer"]
+        SQLiteDB["SQLite DB Engine (syntrak.server.db)\n(users, conversations, messages, events)"]
+        EnvLoader["Zero-Leak Secret Loader (syntrak.config)\n(.env / .syntrak/.env / system vars)"]
+    end
+
+    subgraph Core_Engine["4. Core Orchestration Engine"]
         Session["SessionManager (syntrak.core.session)"]
         Agent["AgentLoop (syntrak.core.agent)"]
         Memory["ConversationMemory & Sliding Window"]
@@ -31,13 +39,13 @@ flowchart TD
         Events["AgentEvent Bus"]
     end
 
-    subgraph LLM_Gateway["4. Model & Gateway Layer"]
+    subgraph LLM_Gateway["5. Model & Gateway Layer"]
         LiteLLM["LiteLLM Unified Client (syntrak.llm.litellm_client)"]
         Parser["ToolCallParser (syntrak.llm.parser)"]
         Providers["Multi-Provider Router\n(Ollama / NVIDIA NIM / OpenRouter / Groq / OpenAI / Gemini / Claude)"]
     end
 
-    subgraph Tool_Engine["5. Tool Execution Engine"]
+    subgraph Tool_Engine["6. Tool Execution Engine"]
         Registry["ToolRegistry (syntrak.tools.base)"]
         FileTools["File Ops (read, write, replace_in_file, list_dir)"]
         GitTools["Git Ops (diff, status, snapshot, rollback)"]
@@ -49,12 +57,18 @@ flowchart TD
     CLI --> Session
     REPL --> Session
     WebUI --> FastAPI
+    GoogleGIS --> AuthService
+    Sidebar --> REST
+    
+    FastAPI --> AuthService
     FastAPI --> SSE & REST
+    FastAPI --> SQLiteDB
+    
     SSE & REST --> Session
-
     Session --> Agent
     Session --> Memory
     Session --> Context
+    Session --> SQLiteDB
 
     Agent --> LLM_Gateway
     Agent --> Tool_Engine
@@ -66,6 +80,7 @@ flowchart TD
     Tool_Engine --> Events
     Events --> REPL
     Events --> SSE
+    SSE --> SQLiteDB
 ```
 
 ---
@@ -75,12 +90,28 @@ flowchart TD
 ### 1. Presentation Layer (`syntrak.ui` & `syntrak.server.static`)
 - **Terminal REPL (`syntrak.ui.repl`)**: Interactive command-line environment built on `prompt_toolkit` and `rich`. Features auto-completion, multiline editing, ANSI styling, and command dispatching (`/help`, `/review`, `/diff`, `/undo`, `/model`, `/clear`).
 - **Rich Renderer (`syntrak.ui.renderer`)**: Formats agent thoughts, tool execution cards, collapsible diff blocks, and streaming code blocks in real-time.
-- **Web Console (`syntrak.server.static`)**: High-density monospace Neovim-styled (`syntrak.nvim`) developer dashboard with 3 primary bufferline tabs (`agent.buf`, `review.diff`, `config.lua`) and 5 selectable color schemes (Gruvbox, Nord, Tokyo Night, Monokai Pro, Solarized Dark).
+- **Web Console (`syntrak.server.static`)**: High-density monospace Neovim-styled (`syntrak.nvim`) developer dashboard with:
+  - Collapsible **ChatGPT-Style History Sidebar** with real-time thread search, date grouping (*Today*, *Yesterday*, *Previous 7 Days*, *Older*), inline title editing, and deletion.
+  - **Google Identity Services Integration** with dynamic button rendering and user profile card.
+  - 3 primary bufferline tabs (`agent.buf`, `review.diff`, `config.lua`) and 5 selectable color schemes (Gruvbox, Nord, Tokyo Night, Monokai Pro, Solarized Dark).
 
 ---
 
-### 2. Core Orchestration Engine (`syntrak.core`)
-- **`SessionManager`**: Coordinates workspace pathing, git state, conversation history, and active LLM configuration across queries.
+### 2. Authentication & Persistence Layer (`syntrak.server.auth` & `syntrak.server.db`)
+- **`syntrak.server.auth`**:
+  - `verify_google_credential`: Cryptographically verifies Google OAuth 2.0 ID tokens against Google's public keys.
+  - `create_jwt_token` & `decode_jwt_token`: Generates and verifies HMAC-SHA256 JWT tokens.
+  - `get_current_user`: FastAPI dependency supporting Authorization headers, HTTP-only cookies, and guest local fallback.
+- **`syntrak.server.db.Database`**:
+  - SQLite backend (`~/.syntrak/syntrak.db`) managing relational tables with foreign keys:
+    - `users`: Google user profiles (`id`, `email`, `name`, `picture`, `created_at`).
+    - `conversations`: Thread records (`id`, `user_id`, `title`, timestamps).
+    - `messages`: Multi-turn turns storing role (`user` / `assistant`), text markdown, and serialized tool/thought event streams.
+
+---
+
+### 3. Core Orchestration Engine (`syntrak.core`)
+- **`SessionManager`**: Coordinates workspace pathing, git state, conversation history, SQLite persistence, and active LLM configuration across queries.
 - **`AgentLoop` (ReAct Cycle)**: Implements an iterative **Reasoning + Action** loop:
   1. Compiles dynamic system prompt including workspace structure, git status, and available tool schemas.
   2. Sends message history + context to the active LLM.
@@ -92,7 +123,7 @@ flowchart TD
 
 ---
 
-### 3. Model & LLM Gateway (`syntrak.llm`)
+### 4. Model & LLM Gateway (`syntrak.llm`)
 - **`LiteLLMClient`**: Abstracted provider layer wrapping LiteLLM to interface uniformly with 100+ local and cloud models (Ollama, NVIDIA NIM, OpenRouter, Groq, OpenAI, Anthropic Claude, Google Gemini, vLLM, LM Studio).
 - **`ToolCallParser`**: Robust streaming XML/JSON parser that extracts structured tool calls from raw LLM completions while isolating natural language reasoning.
 
@@ -173,6 +204,13 @@ sequenceDiagram
 - [x] Cloud deployment blueprint (`render.yaml`) and Docker specifications.
 - [x] Automated 24/7 keep-alive GitHub Actions workflow (`keep-alive.yml`).
 - [x] Live public demo setup at [syntrak.harsh-shah.me](https://syntrak.harsh-shah.me).
+
+### Phase 4: Google Auth, ChatGPT-Style History & Secrets ✅
+- [x] Google OAuth 2.0 Identity Services authentication with backend token validation.
+- [x] JWT sessions with HTTP-only cookies and guest developer fallback.
+- [x] ChatGPT-style collapsible sidebar with real-time thread search, date grouping, renaming, and deletion.
+- [x] SQLite relational storage (`syntrak.server.db`) for persistent users, threads, and streaming tool events.
+- [x] Automated `.env` file discovery, prioritized variable resolution, and `.env.example` template.
 
 <!-- ### Phase 4: Semantic Context & Tree-Sitter Integration 🔄 (In Progress)
 - [ ] Tree-sitter AST parsing for intelligent syntax-aware symbol navigation.

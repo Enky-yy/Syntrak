@@ -16,9 +16,12 @@
 - 🧠 **Multi-Provider & Cloud Model Support**: Works seamlessly with **Ollama**, **NVIDIA NIM**, **OpenRouter**, **vLLM**, **LM Studio**, **OpenAI**, **Anthropic Claude**, **Google Gemini**, **Groq**, or any OpenAI-compatible API.
 - ⚡ **Interactive Terminal REPL**: Built on `prompt_toolkit` and `rich` with command auto-completion, history navigation, streaming markdown, and collapsible tool execution panels.
 - 💻 **Neovim & Tmux Monospace Web Console**: Built-in high-density developer dashboard (`syntrak.nvim`) running in your browser with live buffer tabs, statuslines, and 5 classic color schemes.
+- 🔐 **Google OAuth 2.0 & JWT Sessions**: Secure Google Sign-In with persistent user profiles, avatars, and JWT authorization.
+- 💬 **ChatGPT-Style Chat History**: Collapsible sidebar with categorized date grouping (*Today*, *Yesterday*, *Previous 7 Days*, *Older*), instant thread search, inline renaming, deletion, and full multi-turn conversation recovery powered by SQLite.
 - 🔍 **Automated Code Reviewer**: Run `/review` or `syntrak review` to inspect git diffs for bugs, security vulnerabilities, edge cases, and actionable code fixes.
 - ✏️ **Targeted Code Writer**: Intelligent search-and-replace chunk editing (`replace_in_file`), whole-file manipulation, and safe execution bounds.
 - 🛡️ **Safety & Git Rollback**: Automatic checkpointing via git snapshots allows you to `/undo` changes safely.
+- 🔒 **Zero-Leak Secret Management**: Automated `.env` file loading with prioritized environment overrides and `.env.example` templates.
 - 🌐 **Web Extension Ready**: Event-driven streaming architecture with built-in FastAPI backend (`syntrak serve`) providing Server-Sent Events (SSE) and REST APIs for web-based dashboards.
 
 ---
@@ -32,21 +35,41 @@
 git clone https://github.com/enky-yy/Syntrak.git
 cd Syntrak
 
-# Create virtual environment and install in editable mode
+# Create virtual environment and install dependencies
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
 ```
 
-### 2. Start the Interactive REPL
+### 2. Configure Environment & Secrets (`.env`)
+
+Copy the template and set your API keys or Google OAuth Client ID:
 
 ```bash
-# Start with default local model (Ollama)
+cp .env.example .env
+```
+
+```ini
+# Google OAuth 2.0 Client ID for Web UI (Optional)
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+
+# LLM Model & Endpoint
+LLM_MODEL=openai/meta/llama-3.1-8b-instruct
+LLM_API_BASE=https://integrate.api.nvidia.com/v1
+
+# Provider API Keys
+OPENAI_API_KEY=nvapi-your-key-here
+NVIDIA_API_KEY=nvapi-your-key-here
+```
+
+### 3. Start the Interactive REPL or Web Dashboard
+
+```bash
+# Launch Terminal REPL
 syntrak
 
-# Or launch with a specific model / endpoint
-syntrak --model ollama/qwen2.5-coder:latest
-syntrak --model openai/meta/llama-3.1-8b-instruct --api-base https://integrate.api.nvidia.com/v1 --api-key nvapi-xxxx
+# Or start the Web Dashboard & API Server
+syntrak serve --port 8000
 ```
 
 ---
@@ -225,13 +248,20 @@ syntrak serve --port 8000
 ## 🌐 Web Architecture & Endpoints
 
 When running `syntrak serve --port 8000`, the following endpoints are available:
-- `GET /`: Neovim / Tmux monospace developer dashboard.
-- `POST /api/chat/stream`: Server-Sent Events (SSE) streaming real-time tokens, thoughts, and tool execution status.
-- `GET /api/session/status`: Active session metadata and git status.
+- `GET /`: Neovim / Tmux monospace developer dashboard with ChatGPT-style sidebar and Google Sign-In.
+- `POST /api/auth/google`: Authenticate via Google Identity Services ID token and receive JWT cookie.
+- `POST /api/auth/logout`: Log out user and revoke session cookies.
+- `GET /api/auth/me`: Get active user profile and metadata.
+- `GET /api/conversations`: Retrieve user's conversation threads list.
+- `POST /api/conversations`: Create a new conversation thread.
+- `GET /api/conversations/{id}`: Fetch historical messages, reasoning events, and tool outputs for a thread.
+- `PATCH /api/conversations/{id}`: Rename conversation title.
+- `DELETE /api/conversations/{id}`: Delete a conversation thread.
+- `POST /api/chat/stream`: Server-Sent Events (SSE) streaming real-time tokens, thoughts, and tool execution status with automatic DB persistence.
+- `GET /api/session/status`: Active session metadata, active model, workspace root, and git status.
 - `POST /api/model`: Switch active model and API base dynamically.
 - `GET /api/diff`: Return unified diffs for web-based diff viewers.
 - `POST /api/undo`: Rollback changes via git snapshot.
-- `POST /api/clear`: Reset conversation memory.
 
 ---
 
