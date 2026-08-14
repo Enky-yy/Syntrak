@@ -28,7 +28,7 @@ SLASH_COMMANDS = [
 ]
 
 
-class CampusCompleter(Completer):
+class SyntrakCompleter(Completer):
     """Custom auto-completer for slash commands and workspace file paths."""
 
     def __init__(self):
@@ -61,7 +61,7 @@ async def start_repl(session: Optional[SessionManager] = None):
     prompt_session = PromptSession(
         history=FileHistory(str(history_file)),
         auto_suggest=AutoSuggestFromHistory(),
-        completer=CampusCompleter(),
+        completer=SyntrakCompleter(),
         style=Style.from_dict({
             "prompt": "bold #00d7ff",
             "arrow": "#ff5f87 bold",
@@ -73,7 +73,7 @@ async def start_repl(session: Optional[SessionManager] = None):
     while True:
         try:
             user_input = await prompt_session.prompt_async(
-                [("class:prompt", "\ncampus"), ("class:arrow", " ❯ ")],
+                [("class:prompt", "\nsyntrak"), ("class:arrow", " ❯ ")],
             )
             text = user_input.strip()
             if not text:

@@ -68,7 +68,7 @@ class ReviewConfig(BaseModel):
 class SyntrakConfig(BaseSettings):
     """Main Syntrak configuration."""
     model_config = SettingsConfigDict(
-        env_prefix="CAMPUSCLI_",
+        env_prefix="SYNTRAK_",
         env_nested_delimiter="__",
         extra="ignore"
     )
@@ -83,27 +83,39 @@ class SyntrakConfig(BaseSettings):
     workspace_root: str = Field(default_factory=os.getcwd)
 
     @classmethod
-    def load(cls, config_path: Optional[str] = None) -> "SyntrakConfig":
+    def load(cls, config_path: Optional[str] = None, workspace_root: Optional[str] = None) -> "SyntrakConfig":
         """Load config from ~/.syntrak/config.yaml, local .syntrakrc.yaml, or path."""
         data: Dict[str, Any] = {}
 
         global_path = Path.home() / ".syntrak" / "config.yaml"
         local_path = Path.cwd() / ".syntrakrc.yaml"
 
-        paths_to_check = []
         if config_path:
-            paths_to_check.append(Path(config_path))
-        else:
-            paths_to_check.extend([global_path, local_path])
-
-        for path in paths_to_check:
+            path = Path(config_path)
             if path.is_file():
                 try:
                     with open(path, "r", encoding="utf-8") as f:
-                        file_data = yaml.safe_load(f) or {}
-                        data.update(file_data)
+                        data.update(yaml.safe_load(f) or {})
                 except Exception as e:
                     print(f"Warning: Failed to load config from {path}: {e}")
+        else:
+            if global_path.is_file():
+                try:
+                    with open(global_path, "r", encoding="utf-8") as f:
+                        global_data = yaml.safe_load(f) or {}
+                        # Global config should not hardcode project workspace_root
+                        global_data.pop("workspace_root", None)
+                        data.update(global_data)
+                except Exception as e:
+                    print(f"Warning: Failed to load global config from {global_path}: {e}")
+
+            if local_path.is_file():
+                try:
+                    with open(local_path, "r", encoding="utf-8") as f:
+                        local_data = yaml.safe_load(f) or {}
+                        data.update(local_data)
+                except Exception as e:
+                    print(f"Warning: Failed to load local config from {local_path}: {e}")
 
         # If LLM model is not explicitly defined in file, check popular env vars
         if "llm" not in data:
@@ -113,12 +125,22 @@ class SyntrakConfig(BaseSettings):
         if "api_base" not in data["llm"] and os.getenv("OLLAMA_HOST"):
             data["llm"]["api_base"] = os.getenv("OLLAMA_HOST")
 
+        if workspace_root:
+            data["workspace_root"] = str(Path(workspace_root).resolve())
+        elif "workspace_root" not in data or not data["workspace_root"]:
+            data["workspace_root"] = os.getcwd()
+        else:
+            data["workspace_root"] = str(Path(data["workspace_root"]).resolve())
+
         return cls(**data)
 
     def save_global(self) -> Path:
         """Save current config to global ~/.syntrak/config.yaml."""
         dest = Path.home() / ".syntrak" / "config.yaml"
         dest.parent.mkdir(parents=True, exist_ok=True)
+        dump_data = self.model_dump()
+        # Global config should not pin a single directory as the workspace
+        dump_data.pop("workspace_root", None)
         with open(dest, "w", encoding="utf-8") as f:
-            yaml.dump(self.model_dump(), f, default_flow_style=False)
+            yaml.dump(dump_data, f, default_flow_style=False)
         return dest

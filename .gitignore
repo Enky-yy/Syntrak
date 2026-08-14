@@ -39,6 +39,10 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
-# Local campuscli configs
+# Local syntrak configs
+.syntrakrc.yaml
 .campusclirc.yaml
 history
+1.txt
+*.token
+

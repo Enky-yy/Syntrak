@@ -25,10 +25,11 @@ def main_callback(
     model: Optional[str] = typer.Option(None, "--model", "-m", help="LLM model (e.g. ollama/qwen2.5-coder:latest)"),
     api_base: Optional[str] = typer.Option(None, "--api-base", help="Custom API Base URL (e.g. http://localhost:11434)"),
     api_key: Optional[str] = typer.Option(None, "--api-key", help="API key for LLM provider"),
+    workspace: Optional[str] = typer.Option(None, "--workspace", "-w", help="Workspace root directory"),
 ):
     """Start interactive REPL by default if no subcommand is passed."""
     if ctx.invoked_subcommand is None:
-        cfg = SyntrakConfig.load()
+        cfg = SyntrakConfig.load(workspace_root=workspace)
         if model:
             cfg.llm.model = model
         if api_base:
@@ -45,9 +46,10 @@ def run_command(
     query: str = typer.Argument(..., help="Prompt or task to execute"),
     model: Optional[str] = typer.Option(None, "--model", "-m", help="LLM model to use"),
     api_base: Optional[str] = typer.Option(None, "--api-base", help="Custom API Base URL"),
+    workspace: Optional[str] = typer.Option(None, "--workspace", "-w", help="Workspace root directory"),
 ):
     """Run a single prompt/task non-interactively."""
-    cfg = SyntrakConfig.load()
+    cfg = SyntrakConfig.load(workspace_root=workspace)
     if model:
         cfg.llm.model = model
     if api_base:
@@ -62,9 +64,10 @@ def review_command(
     staged: bool = typer.Option(False, "--staged", "-s", help="Review only staged changes"),
     target_branch: Optional[str] = typer.Option(None, "--target-branch", "-b", help="Compare against branch"),
     model: Optional[str] = typer.Option(None, "--model", "-m", help="LLM model to use"),
+    workspace: Optional[str] = typer.Option(None, "--workspace", "-w", help="Workspace root directory"),
 ):
     """Perform automated code review on current diff."""
-    cfg = SyntrakConfig.load()
+    cfg = SyntrakConfig.load(workspace_root=workspace)
     if model:
         cfg.llm.model = model
 
@@ -92,10 +95,17 @@ def serve_command(
     host: str = typer.Option("127.0.0.1", "--host", "-h", help="Host address to bind"),
     port: int = typer.Option(8000, "--port", "-p", help="Port number"),
     reload: bool = typer.Option(False, "--reload", help="Enable auto-reload for dev"),
+    workspace: Optional[str] = typer.Option(None, "--workspace", "-w", help="Workspace root directory"),
 ):
     """Launch the Web API server (SSE / REST) to connect a Web UI."""
     console.print(f"[bold cyan]🚀 Starting Syntrak Web API server on http://{host}:{port}[/bold cyan]")
-    uvicorn.run("syntrak.server.app:app", host=host, port=port, reload=reload)
+    if workspace:
+        from syntrak.server.app import create_app
+        cfg = SyntrakConfig.load(workspace_root=workspace)
+        server_app = create_app(config=cfg)
+        uvicorn.run(server_app, host=host, port=port, reload=reload)
+    else:
+        uvicorn.run("syntrak.server.app:app", host=host, port=port, reload=reload)
 
 
 @app.command(name="init")
