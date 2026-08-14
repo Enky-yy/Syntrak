@@ -39,10 +39,14 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
-# Local syntrak configs
+# Local syntrak configs and secrets
 .syntrakrc.yaml
 .campusclirc.yaml
 history
 1.txt
 *.token
+.env
+*.env
+*.db
+
 

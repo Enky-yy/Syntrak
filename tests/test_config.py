@@ -29,3 +29,18 @@ def test_save_global_omits_workspace_root(tmp_path, monkeypatch):
         saved_data = yaml.safe_load(f)
 
     assert "workspace_root" not in saved_data
+
+
+def test_env_file_loading(tmp_path, monkeypatch):
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "GOOGLE_CLIENT_ID=test-google-client-id-123.apps.googleusercontent.com\n"
+        "LLM_MODEL=openai/gpt-4o\n"
+        "OPENAI_API_KEY=sk-test-secret-key\n",
+        encoding="utf-8"
+    )
+
+    cfg = SyntrakConfig.load(env_file=str(env_file), workspace_root=str(tmp_path))
+    assert cfg.google_client_id == "test-google-client-id-123.apps.googleusercontent.com"
+    assert cfg.llm.model == "openai/gpt-4o"
+    assert cfg.llm.api_key == "sk-test-secret-key"

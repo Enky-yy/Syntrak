@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="gruvbox">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>syntrak.nvim — Developer Console</title>
+  <title>syntrak.nvim — Developer Console & AI Assistant</title>
   
   <!-- JetBrains Mono & Nerd Font Glyphs -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,12 +14,18 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
   <link rel="stylesheet" href="/static/styles.css">
+
+  <!-- Google Identity Services (GIS) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
   <div class="nvim-container">
     <!-- Top Bufferline / Tabline -->
-    <div class="bufferline">
+    <header class="bufferline">
       <div class="buffer-tabs">
+        <button class="buffer-tab-toggle" id="btnToggleSidebar" title="Toggle Chat History Sidebar (Ctrl+B)">
+          <i class="fa-solid fa-bars"></i>
+        </button>
         <button class="buffer-tab active" data-tab="tabChat">
           <span class="tab-index">1</span>
           <span class="tab-icon">󰈚</span>
@@ -58,153 +64,198 @@
         </div>
         <span class="nvim-version">syntrak.nvim [v0.1.0]</span>
       </div>
-    </div>
+    </header>
 
-    <!-- Main Editor Window Split -->
-    <div class="editor-window">
-      <!-- Buffer Viewport (Chat) -->
-      <section class="window-pane active" id="tabChat">
-        <div class="terminal-feed" id="chatMessages">
-          <!-- Neovim Welcome Header -->
-          <div class="nvim-splash">
-            <pre class="ascii-banner">
+    <!-- Main Workspace Split -->
+    <div class="workspace-wrapper">
+      <!-- ChatGPT-Style Collapsible Sidebar -->
+      <aside class="chat-sidebar" id="chatSidebar">
+        <div class="sidebar-top">
+          <button class="btn-new-chat" id="btnNewChat" title="Start a fresh conversation thread">
+            <i class="fa-solid fa-plus"></i>
+            <span>New Chat</span>
+          </button>
+          <div class="sidebar-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="sidebarSearchInput" placeholder="Search chats..." />
+          </div>
+        </div>
+
+        <div class="conversations-scroll" id="conversationList">
+          <!-- Dynamic conversation groups rendered by app.js -->
+          <div class="sidebar-empty-state">
+            <i class="fa-regular fa-comments"></i>
+            <span>No conversations yet</span>
+          </div>
+        </div>
+
+        <div class="sidebar-footer" id="sidebarFooter">
+          <!-- Unauthenticated View (Google Sign-In) -->
+          <div class="auth-box" id="authBox">
+            <div id="googleSignInContainer"></div>
+          </div>
+
+          <!-- Authenticated User Profile Card -->
+          <div class="user-card" id="userCard">
+            <div class="user-avatar-wrap">
+              <img id="userAvatar" class="user-avatar" src="" alt="Avatar" style="display: none;" />
+              <div id="userAvatarFallback" class="user-avatar-fallback"><i class="fa-solid fa-user"></i></div>
+            </div>
+            <div class="user-meta">
+              <span class="user-name" id="userName">Guest Developer</span>
+              <span class="user-email" id="userEmail">Local Mode</span>
+            </div>
+            <button class="btn-logout" id="btnLogout" title="Log out / Switch account">
+              <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Editor Window Split -->
+      <main class="editor-window">
+        <!-- Buffer Viewport (Chat) -->
+        <section class="window-pane active" id="tabChat">
+          <!-- Active Conversation Header Bar -->
+          <div class="chat-thread-bar">
+            <div class="thread-info">
+              <i class="fa-regular fa-message thread-icon"></i>
+              <span class="thread-title" id="activeThreadTitle" contenteditable="false">New Chat</span>
+              <button class="btn-thread-edit" id="btnEditTitle" title="Rename conversation">
+                <i class="fa-solid fa-pencil"></i>
+              </button>
+            </div>
+            <div class="thread-actions">
+              <button class="btn-thread-action" id="btnDeleteActiveThread" title="Delete current conversation">
+                <i class="fa-regular fa-trash-can"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="terminal-feed" id="chatMessages">
+            <!-- Neovim Welcome Splash -->
+            <div class="nvim-splash" id="nvimSplash">
+              <pre class="ascii-banner">
   ███████╗██╗   ██╗███╗   ██╗████████╗██████╗  █████╗ ██╗  ██╗
   ██╔════╝╚██╗ ██╔╝████╗  ██║╚══██╔══╝██╔══██╗██╔══██╗██║ ██╔╝
   ███████╗ ╚████╔╝ ██╔██╗ ██║   ██║   ██████╔╝███████║█████╔╝ 
   ╚════██║  ╚██╔╝  ██║╚██╗██║   ██║   ██╔══██╗██╔══██║██╔═██╗ 
   ███████║   ██║   ██║ ╚████║   ██║   ██║  ██║██║  ██║██║  ██╗
   ╚══════╝   ╚═╝   ╚═╝  ╚═══╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝
-            </pre>
-            <div class="splash-meta">
-              <span>-- Autonomous Code Reviewer & Assistant --</span>
-              <span>type <kbd>:help</kbd> or <kbd>/</kbd> for command palette &bull; <kbd>:Review</kbd> to audit diff</span>
-            </div>
+              </pre>
+              <div class="splash-meta">
+                <span>-- Autonomous Code Reviewer & Coding Assistant --</span>
+                <span>type <kbd>:help</kbd> or <kbd>/</kbd> for command palette &bull; <kbd>:Review</kbd> to audit diff</span>
+              </div>
 
-            <div class="quick-commands-grid">
-              <div class="cmd-chip" onclick="sendQuickPrompt('/review')">
-                <span class="cmd-key">:Review</span>
-                <span class="cmd-desc">Run PR & diff quality audit</span>
-              </div>
-              <div class="cmd-chip" onclick="sendQuickPrompt('Analyze repository architecture and core components')">
-                <span class="cmd-key">:Inspect</span>
-                <span class="cmd-desc">Map module dependencies</span>
-              </div>
-              <div class="cmd-chip" onclick="sendQuickPrompt('Write pytest unit tests for key agent modules')">
-                <span class="cmd-key">:Test</span>
-                <span class="cmd-desc">Generate test suites</span>
-              </div>
-              <div class="cmd-chip" onclick="sendQuickPrompt('Scan codebase for security gaps and credential exposure')">
-                <span class="cmd-key">:Audit</span>
-                <span class="cmd-desc">Security & sanitize scan</span>
+              <div class="quick-commands-grid">
+                <div class="cmd-chip" onclick="sendQuickPrompt('/review')">
+                  <span class="cmd-key">:Review</span>
+                  <span class="cmd-desc">Run PR & diff quality audit</span>
+                </div>
+                <div class="cmd-chip" onclick="sendQuickPrompt('Analyze repository architecture and core components')">
+                  <span class="cmd-key">:Inspect</span>
+                  <span class="cmd-desc">Map module dependencies</span>
+                </div>
+                <div class="cmd-chip" onclick="sendQuickPrompt('Write pytest unit tests for key agent modules')">
+                  <span class="cmd-key">:Test</span>
+                  <span class="cmd-desc">Generate test suites</span>
+                </div>
+                <div class="cmd-chip" onclick="sendQuickPrompt('Scan codebase for security gaps and credential exposure')">
+                  <span class="cmd-key">:Audit</span>
+                  <span class="cmd-desc">Security & sanitize scan</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Command Line / Prompt Box -->
-        <div class="cmdline-container">
-          <!-- Slash Commands Autocomplete Popup -->
-          <div class="slash-popup" id="slashPopup">
-            <div class="slash-title">-- COMMANDS (TAB TO SELECT) --</div>
-            <div class="slash-row" data-cmd="/review">
-              <span class="s-cmd">/review</span>
-              <span class="s-desc">Run code audit on working changes</span>
+          <!-- Command Line / Prompt Box -->
+          <div class="cmdline-container">
+            <!-- Slash Commands Autocomplete Popup -->
+            <div class="slash-popup" id="slashPopup">
+              <div class="slash-title">-- COMMANDS (TAB TO SELECT) --</div>
+              <div class="slash-row" data-cmd="/review">
+                <span class="s-cmd">/review</span>
+                <span class="s-desc">Run code audit on working changes</span>
+              </div>
+              <div class="slash-row" data-cmd="/commit">
+                <span class="s-cmd">/commit</span>
+                <span class="s-desc">Generate Conventional Commit & push snapshot</span>
+              </div>
+              <div class="slash-row" data-cmd="/undo">
+                <span class="s-cmd">/undo</span>
+                <span class="s-desc">Rollback to previous git snapshot</span>
+              </div>
+              <div class="slash-row" data-cmd="/clear">
+                <span class="s-cmd">/clear</span>
+                <span class="s-desc">Reset conversation buffer memory</span>
+              </div>
             </div>
-            <div class="slash-row" data-cmd="/commit">
-              <span class="s-cmd">/commit</span>
-              <span class="s-desc">Generate Conventional Commit & push snapshot</span>
-            </div>
-            <div class="slash-row" data-cmd="/undo">
-              <span class="s-cmd">/undo</span>
-              <span class="s-desc">Rollback to previous git snapshot</span>
-            </div>
-            <div class="slash-row" data-cmd="/clear">
-              <span class="s-cmd">/clear</span>
-              <span class="s-desc">Reset conversation buffer memory</span>
-            </div>
+
+            <form class="cmdline-form" id="chatForm" onsubmit="event.preventDefault(); return false;">
+              <span class="cmdline-prompt">❯</span>
+              <textarea
+                id="promptInput"
+                placeholder="Ask a question, request code changes, or type '/' for commands..."
+                rows="1"
+              ></textarea>
+              <div class="cmdline-actions">
+                <button type="button" class="btn-cmd btn-cmd-clear" id="btnClearChat" title="Clear Chat (:clear)">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+                <button type="button" class="btn-cmd btn-cmd-send" id="btnSend" title="Execute (Enter)">
+                  <i class="fa-solid fa-arrow-turn-down fa-rotate-90"></i>
+                </button>
+                <button type="button" class="btn-cmd btn-cmd-stop hidden" id="btnStop" title="Interrupt (Ctrl+C)">
+                  <i class="fa-solid fa-stop"></i>
+                </button>
+              </div>
+            </form>
           </div>
+        </section>
 
-          <form class="cmdline-form" id="chatForm" onsubmit="event.preventDefault(); return false;">
-            <span class="cmdline-prompt">❯</span>
-            <textarea
-              id="promptInput"
-              placeholder="Ask a question, request code changes, or type '/' for commands..."
-              rows="1"
-            ></textarea>
-            <div class="cmdline-actions">
-              <button type="button" class="btn-cmd btn-cmd-clear" id="btnClearChat" title="Clear Buffer (:clear)">
-                <i class="fa-solid fa-trash-can"></i>
-              </button>
-              <button type="button" class="btn-cmd btn-cmd-send" id="btnSend" title="Execute (Enter)">
-                <i class="fa-solid fa-arrow-turn-down fa-rotate-90"></i>
-              </button>
-              <button type="button" class="btn-cmd btn-cmd-stop hidden" id="btnStop" title="Interrupt (Ctrl+C)">
-                <i class="fa-solid fa-stop"></i>
-              </button>
-            </div>
-          </form>
-        </div>
-      </section>
-
-      <!-- Review Buffer (Tab 2) -->
-      <section class="window-pane" id="tabReview">
-        <div class="pane-header">
-          <span>󰃢 review.diff [Code Review Buffer]</span>
-          <button class="btn-nvim-sm" onclick="sendQuickPrompt('/review')">
-            <i class="fa-solid fa-play"></i> :RunReview
-          </button>
-        </div>
-        <div class="pane-body" id="reviewOutput">
-          <div class="empty-buffer">
-            <p>-- No active review generated --</p>
-            <p>Click <code>:RunReview</code> or run <code>/review</code> in the command line.</p>
-          </div>
-        </div>
-      </section>
-
-      <!-- Config Buffer (Tab 3) -->
-      <section class="window-pane" id="tabConfig">
-        <div class="pane-header">
-          <span> config.lua [LLM & Provider Configuration]</span>
-        </div>
-        <div class="pane-body">
-          <form class="nvim-form" id="configForm">
-            <div class="nvim-form-group">
-              <label>vim.g.model =</label>
-              <input type="text" id="cfgModel" placeholder="e.g. openai/meta/llama-3.1-8b-instruct" required>
-            </div>
-            <div class="nvim-form-group">
-              <label>vim.g.api_base =</label>
-              <input type="text" id="cfgApiBase" placeholder="e.g. https://integrate.api.nvidia.com/v1">
-            </div>
-            <div class="nvim-form-group">
-              <label>vim.g.api_key =</label>
-              <input type="password" id="cfgApiKey" placeholder="your-api-key-here">
-            </div>
-            <button type="submit" class="btn-nvim-save">
-              <i class="fa-solid fa-floppy-disk"></i> :w (Save Settings)
+        <!-- Review Buffer (Tab 2) -->
+        <section class="window-pane" id="tabReview">
+          <div class="pane-header">
+            <span>󰃢 review.diff [Code Review Buffer]</span>
+            <button class="btn-nvim-sm" onclick="sendQuickPrompt('/review')">
+              <i class="fa-solid fa-play"></i> :RunReview
             </button>
-          </form>
-
-          <div class="nvim-presets">
-            <span class="preset-title">-- PRESET PROVIDERS (:e preset) --</span>
-            <div class="preset-rows">
-              <div class="p-row" onclick="applyPreset('ollama/qwen2.5-coder:latest', 'http://localhost:11434', '')">
-                <span class="p-name">1. Ollama Qwen 2.5 Coder</span>
-                <span class="p-url">http://localhost:11434</span>
-              </div>
-              <div class="p-row" onclick="applyPreset('openai/meta/llama-3.1-8b-instruct', 'https://integrate.api.nvidia.com/v1', '')">
-                <span class="p-name">2. NVIDIA Llama 3.1 8B</span>
-                <span class="p-url">https://integrate.api.nvidia.com/v1</span>
-              </div>
-              <div class="p-row" onclick="applyPreset('openai/deepseek-ai/deepseek-r1', 'https://integrate.api.nvidia.com/v1', '')">
-                <span class="p-name">3. DeepSeek-R1</span>
-                <span class="p-url">NVIDIA NIM Endpoint</span>
-              </div>
+          </div>
+          <div class="pane-body" id="reviewOutput">
+            <div class="empty-buffer">
+              <p>-- No active review generated --</p>
+              <p>Click <code>:RunReview</code> or run <code>/review</code> in the command line.</p>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+
+        <!-- Config Buffer (Tab 3) -->
+        <section class="window-pane" id="tabConfig">
+          <div class="pane-header">
+            <span> config.lua [LLM & Provider Configuration]</span>
+          </div>
+          <div class="pane-body">
+            <form class="nvim-form" id="configForm">
+              <div class="nvim-form-group">
+                <label>vim.g.model =</label>
+                <input type="text" id="cfgModel" placeholder="e.g. openai/meta/llama-3.1-8b-instruct" required>
+              </div>
+              <div class="nvim-form-group">
+                <label>vim.g.api_base =</label>
+                <input type="text" id="cfgApiBase" placeholder="e.g. https://integrate.api.nvidia.com/v1">
+              </div>
+              <div class="nvim-form-group">
+                <label>vim.g.api_key =</label>
+                <input type="password" id="cfgApiKey" placeholder="your-api-key-here">
+              </div>
+              <button type="submit" class="btn-nvim-save">
+                <i class="fa-solid fa-floppy-disk"></i> :w (Save Settings)
+              </button>
+            </form>
+          </div>
+        </section>
+      </main>
     </div>
 
     <!-- Bottom Tmux / Powerline Statusline -->

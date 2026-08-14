@@ -4,15 +4,71 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
+# Authentication Schemas
+class GoogleAuthRequest(BaseModel):
+    credential: str = Field(..., description="Google ID Token credential string from GIS")
+
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    name: Optional[str] = None
+    picture: Optional[str] = None
+
+
+class AuthResponse(BaseModel):
+    token: str
+    user: UserResponse
+
+
+# Conversation & Message Schemas
+class MessageResponse(BaseModel):
+    id: str
+    conversation_id: str
+    role: str
+    content: Optional[str] = None
+    events: List[Dict[str, Any]] = Field(default_factory=list)
+    created_at: str
+
+
+class ConversationSummary(BaseModel):
+    id: str
+    user_id: str
+    title: str
+    message_count: int = 0
+    created_at: str
+    updated_at: str
+
+
+class ConversationDetail(BaseModel):
+    id: str
+    user_id: str
+    title: str
+    created_at: str
+    updated_at: str
+    messages: List[MessageResponse] = Field(default_factory=list)
+
+
+class CreateConversationRequest(BaseModel):
+    title: Optional[str] = "New Chat"
+
+
+class UpdateConversationRequest(BaseModel):
+    title: str
+
+
+# Chat & Agent Schemas
 class ChatRequest(BaseModel):
     query: str = Field(..., description="User prompt or instruction")
     custom_instructions: Optional[str] = None
+    conversation_id: Optional[str] = None
 
 
 class SwitchModelRequest(BaseModel):
     model: str = Field(..., description="New model name (e.g. ollama/qwen2.5-coder:32b)")
     api_base: Optional[str] = None
     api_key: Optional[str] = None
+    google_client_id: Optional[str] = None
 
 
 class SessionInfoResponse(BaseModel):
@@ -21,6 +77,8 @@ class SessionInfoResponse(BaseModel):
     workspace_root: str
     git_status: str
     max_steps: int
+    google_client_id: Optional[str] = None
+    user: Optional[UserResponse] = None
 
 
 class ReviewRequest(BaseModel):

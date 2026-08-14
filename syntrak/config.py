@@ -65,6 +65,41 @@ class ReviewConfig(BaseModel):
     strictness: str = Field(default="medium", description="low | medium | high | strict")
 
 
+def load_env_file(filepath: Path, override_environ: bool = True) -> Dict[str, str]:
+    """Parse and load key-value pairs from a .env file into os.environ and return dict."""
+    env_vars: Dict[str, str] = {}
+    if not filepath.is_file():
+        return env_vars
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" in line:
+                    key, _, value = line.partition("=")
+                    key = key.strip()
+                    value = value.strip()
+                    # Strip wrapping quotes
+                    if len(value) >= 2 and ((value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'"))):
+                        value = value[1:-1]
+                    if key:
+                        env_vars[key] = value
+                        if override_environ or key not in os.environ:
+                            os.environ[key] = value
+                            if key == "GOOGLE_CLIENT_ID":
+                                os.environ["SYNTRAK_GOOGLE_CLIENT_ID"] = value
+                            elif key in ("LLM_MODEL", "MODEL"):
+                                os.environ["SYNTRAK_LLM__MODEL"] = value
+                            elif key in ("LLM_API_BASE", "API_BASE"):
+                                os.environ["SYNTRAK_LLM__API_BASE"] = value
+                            elif key in ("LLM_API_KEY", "API_KEY"):
+                                os.environ["SYNTRAK_LLM__API_KEY"] = value
+    except Exception as e:
+        print(f"Warning: Failed to load .env file from {filepath}: {e}")
+    return env_vars
+
+
 class SyntrakConfig(BaseSettings):
     """Main Syntrak configuration."""
     model_config = SettingsConfigDict(
@@ -81,10 +116,21 @@ class SyntrakConfig(BaseSettings):
     enable_git_snapshots: bool = Field(default=True, description="Take git stashes/checkpoints before major changes")
     custom_system_prompt: Optional[str] = None
     workspace_root: str = Field(default_factory=os.getcwd)
+    google_client_id: Optional[str] = Field(default=None, description="Google OAuth 2.0 Client ID for Web UI authentication")
 
     @classmethod
-    def load(cls, config_path: Optional[str] = None, workspace_root: Optional[str] = None) -> "SyntrakConfig":
-        """Load config from ~/.syntrak/config.yaml, local .syntrakrc.yaml, or path."""
+    def load(cls, config_path: Optional[str] = None, workspace_root: Optional[str] = None, env_file: Optional[str] = None) -> "SyntrakConfig":
+        """Load config from .env files, ~/.syntrak/config.yaml, local .syntrakrc.yaml, or path."""
+        env_data: Dict[str, str] = {}
+        # 1. Discover and load .env files
+        if env_file:
+            env_data.update(load_env_file(Path(env_file)))
+        else:
+            if workspace_root:
+                env_data.update(load_env_file(Path(workspace_root) / ".env"))
+            env_data.update(load_env_file(Path.cwd() / ".env"))
+            env_data.update(load_env_file(Path.home() / ".syntrak" / ".env"))
+
         data: Dict[str, Any] = {}
 
         global_path = Path.home() / ".syntrak" / "config.yaml"
@@ -117,13 +163,50 @@ class SyntrakConfig(BaseSettings):
                 except Exception as e:
                     print(f"Warning: Failed to load local config from {local_path}: {e}")
 
-        # If LLM model is not explicitly defined in file, check popular env vars
+        # Check LLM model & keys from .env and environment variables
         if "llm" not in data:
             data["llm"] = {}
-        if "api_key" not in data["llm"] and os.getenv("OPENAI_API_KEY"):
-            data["llm"]["api_key"] = os.getenv("OPENAI_API_KEY")
-        if "api_base" not in data["llm"] and os.getenv("OLLAMA_HOST"):
-            data["llm"]["api_base"] = os.getenv("OLLAMA_HOST")
+
+        # .env values explicitly override YAML config
+        model_env = env_data.get("LLM_MODEL") or env_data.get("MODEL")
+        if model_env or "model" not in data["llm"]:
+            model_val = model_env or os.getenv("SYNTRAK_LLM_MODEL") or os.getenv("LLM_MODEL") or os.getenv("MODEL")
+            if model_val:
+                data["llm"]["model"] = model_val
+
+        key_env = (
+            env_data.get("LLM_API_KEY") or
+            env_data.get("OPENAI_API_KEY") or
+            env_data.get("ANTHROPIC_API_KEY") or
+            env_data.get("GEMINI_API_KEY") or
+            env_data.get("GROQ_API_KEY") or
+            env_data.get("NVIDIA_API_KEY")
+        )
+        if key_env or "api_key" not in data["llm"]:
+            key_val = (
+                key_env or
+                os.getenv("SYNTRAK_LLM_API_KEY") or
+                os.getenv("LLM_API_KEY") or
+                os.getenv("OPENAI_API_KEY") or
+                os.getenv("ANTHROPIC_API_KEY") or
+                os.getenv("GEMINI_API_KEY") or
+                os.getenv("GROQ_API_KEY") or
+                os.getenv("NVIDIA_API_KEY")
+            )
+            if key_val:
+                data["llm"]["api_key"] = key_val
+
+        base_env = env_data.get("LLM_API_BASE") or env_data.get("API_BASE")
+        if base_env or "api_base" not in data["llm"]:
+            base_val = base_env or os.getenv("SYNTRAK_LLM_API_BASE") or os.getenv("LLM_API_BASE") or os.getenv("API_BASE") or os.getenv("OLLAMA_HOST")
+            if base_val:
+                data["llm"]["api_base"] = base_val
+
+        gid_env = env_data.get("GOOGLE_CLIENT_ID") or env_data.get("SYNTRAK_GOOGLE_CLIENT_ID")
+        if gid_env or "google_client_id" not in data or not data["google_client_id"]:
+            gid_val = gid_env or os.getenv("SYNTRAK_GOOGLE_CLIENT_ID") or os.getenv("GOOGLE_CLIENT_ID")
+            if gid_val:
+                data["google_client_id"] = gid_val
 
         if workspace_root:
             data["workspace_root"] = str(Path(workspace_root).resolve())

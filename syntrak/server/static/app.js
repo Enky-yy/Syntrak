@@ -1,25 +1,495 @@
 /**
  * syntrak.nvim — Web UI Client Logic
+ * ChatGPT-style Chat History, Google Auth, and Multi-turn ReAct Agent Stream
  */
 
 let activeAbortController = null;
+let activeConversationId = null;
+let conversationsCache = [];
+let currentUser = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   initThemeSelector();
   initTabs();
+  initSidebar();
   initSlashPopup();
   initChatForm();
+  initAuth();
   loadSessionStatus();
+  loadConversations();
 
   document.getElementById('btnQuickReview')?.addEventListener('click', () => {
     sendQuickPrompt('/review');
   });
   document.getElementById('btnQuickUndo')?.addEventListener('click', handleUndo);
-  document.getElementById('btnClearChat')?.addEventListener('click', clearChat);
+  document.getElementById('btnClearChat')?.addEventListener('click', clearCurrentChat);
   document.getElementById('configForm')?.addEventListener('submit', handleConfigSave);
+  document.getElementById('btnNewChat')?.addEventListener('click', startNewConversation);
+  document.getElementById('btnToggleSidebar')?.addEventListener('click', toggleSidebar);
+  document.getElementById('btnDeleteActiveThread')?.addEventListener('click', deleteCurrentActiveThread);
+  document.getElementById('btnEditTitle')?.addEventListener('click', enableTitleEdit);
+  document.getElementById('btnLogout')?.addEventListener('click', handleLogout);
 });
 
-/* Theme Selector (:colorscheme) */
+/* ==========================================================================
+   Authentication & User State (Google Identity Services & JWT)
+   ========================================================================== */
+function initAuth() {
+  const token = localStorage.getItem('syntrak_token');
+  if (token) {
+    fetchUserProfile();
+  }
+}
+
+// Global callback for Google GIS button
+window.handleGoogleCredential = async function(response) {
+  try {
+    const res = await fetch('/api/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential: response.credential })
+    });
+
+    if (!res.ok) {
+      throw new Error(`Google Auth failed (${res.status})`);
+    }
+
+    const data = await res.json();
+    localStorage.setItem('syntrak_token', data.token);
+    renderUserProfile(data.user);
+    showToast(`Welcome, ${data.user.name || 'Developer'}!`);
+    loadConversations();
+  } catch (err) {
+    showToast(`Google Sign-In Error: ${err.message}`, 'error');
+  }
+};
+
+async function fetchUserProfile() {
+  const token = localStorage.getItem('syntrak_token');
+  try {
+    const res = await fetch('/api/auth/me', {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    });
+    if (res.ok) {
+      const user = await res.json();
+      renderUserProfile(user);
+    }
+  } catch (err) {
+    console.error('Failed to fetch user profile:', err);
+  }
+}
+
+function renderUserProfile(user) {
+  const authBox = document.getElementById('authBox');
+  const userCard = document.getElementById('userCard');
+  const userName = document.getElementById('userName');
+  const userEmail = document.getElementById('userEmail');
+  const userAvatar = document.getElementById('userAvatar');
+  const userAvatarFallback = document.getElementById('userAvatarFallback');
+
+  if (user && user.id && user.id !== 'guest-developer') {
+    currentUser = user;
+    if (authBox) authBox.style.display = 'none';
+    if (userCard) userCard.style.display = 'flex';
+    if (userName) userName.textContent = user.name || 'Authenticated User';
+    if (userEmail) userEmail.textContent = user.email || '';
+
+    if (user.picture && userAvatar) {
+      userAvatar.src = user.picture;
+      userAvatar.style.display = 'block';
+      if (userAvatarFallback) userAvatarFallback.style.display = 'none';
+    } else {
+      if (userAvatar) userAvatar.style.display = 'none';
+      if (userAvatarFallback) userAvatarFallback.style.display = 'flex';
+    }
+  } else {
+    currentUser = null;
+    if (authBox) authBox.style.display = 'flex';
+    if (userCard) userCard.style.display = 'none';
+  }
+}
+
+async function handleLogout() {
+  try {
+    await fetch('/api/auth/logout', { method: 'POST' });
+  } catch (e) {}
+
+  localStorage.removeItem('syntrak_token');
+  document.cookie = 'syntrak_token=; Max-Age=0; path=/;';
+
+  if (window.google && window.google.accounts && window.google.accounts.id) {
+    try {
+      google.accounts.id.disableAutoSelect();
+    } catch (e) {}
+  }
+
+  renderUserProfile(null);
+  startNewConversation();
+  showToast('Logged out of session.');
+  loadConversations();
+}
+
+function getAuthHeaders() {
+  const token = localStorage.getItem('syntrak_token');
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+/* ==========================================================================
+   ChatGPT-Style Chat History & Sidebar Management
+   ========================================================================== */
+function initSidebar() {
+  const searchInput = document.getElementById('sidebarSearchInput');
+  searchInput?.addEventListener('input', (e) => {
+    const query = e.target.value.toLowerCase();
+    filterConversations(query);
+  });
+}
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('chatSidebar');
+  if (sidebar) {
+    sidebar.classList.toggle('collapsed');
+  }
+}
+
+async function loadConversations() {
+  const listContainer = document.getElementById('conversationList');
+  try {
+    const res = await fetch('/api/conversations', {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) return;
+
+    conversationsCache = await res.json();
+    renderConversationGroups(conversationsCache);
+  } catch (err) {
+    console.error('Failed to load conversations:', err);
+  }
+}
+
+function renderConversationGroups(conversations) {
+  const listContainer = document.getElementById('conversationList');
+  if (!listContainer) return;
+
+  listContainer.innerHTML = '';
+
+  if (!conversations || conversations.length === 0) {
+    listContainer.innerHTML = `
+      <div class="sidebar-empty-state">
+        <i class="fa-regular fa-comments"></i>
+        <span>No conversations yet</span>
+      </div>
+    `;
+    return;
+  }
+
+  // Group conversations by Date (Today, Yesterday, Previous 7 Days, Older)
+  const groups = {
+    'Today': [],
+    'Yesterday': [],
+    'Previous 7 Days': [],
+    'Older': []
+  };
+
+  const now = new Date();
+  const oneDay = 24 * 60 * 60 * 1000;
+
+  conversations.forEach(conv => {
+    const date = new Date(conv.updated_at || conv.created_at);
+    const diffDays = Math.floor((now - date) / oneDay);
+
+    if (diffDays === 0 && now.getDate() === date.getDate()) {
+      groups['Today'].push(conv);
+    } else if (diffDays <= 1) {
+      groups['Yesterday'].push(conv);
+    } else if (diffDays <= 7) {
+      groups['Previous 7 Days'].push(conv);
+    } else {
+      groups['Older'].push(conv);
+    }
+  });
+
+  Object.entries(groups).forEach(([groupName, items]) => {
+    if (items.length === 0) return;
+
+    const header = document.createElement('div');
+    header.className = 'conv-group-header';
+    header.textContent = groupName;
+    listContainer.appendChild(header);
+
+    items.forEach(conv => {
+      const item = document.createElement('div');
+      item.className = `conv-item ${conv.id === activeConversationId ? 'active' : ''}`;
+      item.id = `conv-${conv.id}`;
+
+      item.innerHTML = `
+        <div class="conv-item-left">
+          <i class="fa-regular fa-message"></i>
+          <span class="conv-item-title" title="${escapeHtml(conv.title)}">${escapeHtml(conv.title)}</span>
+        </div>
+        <div class="conv-item-actions">
+          <button class="btn-conv-action btn-conv-edit" title="Rename"><i class="fa-solid fa-pencil"></i></button>
+          <button class="btn-conv-action btn-conv-del" title="Delete"><i class="fa-regular fa-trash-can"></i></button>
+        </div>
+      `;
+
+      item.querySelector('.conv-item-left').addEventListener('click', () => {
+        selectConversation(conv.id);
+      });
+
+      item.querySelector('.btn-conv-edit').addEventListener('click', (e) => {
+        e.stopPropagation();
+        promptRenameConversation(conv.id, conv.title);
+      });
+
+      item.querySelector('.btn-conv-del').addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteConversationById(conv.id);
+      });
+
+      listContainer.appendChild(item);
+    });
+  });
+}
+
+function filterConversations(query) {
+  if (!query) {
+    renderConversationGroups(conversationsCache);
+    return;
+  }
+  const filtered = conversationsCache.filter(c => c.title.toLowerCase().includes(query));
+  renderConversationGroups(filtered);
+}
+
+async function selectConversation(convId) {
+  activeConversationId = convId;
+  switchTab('tabChat');
+
+  // Update active styling in sidebar
+  document.querySelectorAll('.conv-item').forEach(item => {
+    item.classList.toggle('active', item.id === `conv-${convId}`);
+  });
+
+  const chatContainer = document.getElementById('chatMessages');
+  chatContainer.innerHTML = '<div class="splash-meta"><span>Loading thread messages...</span></div>';
+
+  try {
+    const res = await fetch(`/api/conversations/${convId}`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Conversation not found');
+
+    const data = await res.json();
+    document.getElementById('activeThreadTitle').textContent = data.title;
+    renderConversationMessages(data.messages);
+  } catch (err) {
+    showToast(`Failed to load thread: ${err.message}`, 'error');
+  }
+}
+
+function renderConversationMessages(messages) {
+  const container = document.getElementById('chatMessages');
+  container.innerHTML = '';
+
+  if (!messages || messages.length === 0) {
+    renderEmptySplash();
+    return;
+  }
+
+  messages.forEach(msg => {
+    if (msg.role === 'user') {
+      appendUserMessage(msg.content);
+    } else if (msg.role === 'assistant') {
+      const msgEl = createAssistantMessageElement();
+      const contentEl = msgEl.querySelector('.message-content');
+      
+      // Render historical thoughts and tools if available
+      if (msg.events && msg.events.length > 0) {
+        msg.events.forEach(evt => {
+          if (evt.event_type === 'tool_start') {
+            const card = document.createElement('div');
+            card.className = 'tool-card';
+            card.id = `tool-${evt.tool_id}`;
+            card.innerHTML = `
+              <div class="tool-card-header">
+                <span> tool: ${evt.tool_name}</span>
+                <span>[COMPLETED]</span>
+              </div>
+              <div class="tool-card-body">${escapeHtml(JSON.stringify(evt.arguments, null, 2))}</div>
+            `;
+            contentEl.appendChild(card);
+          } else if (evt.event_type === 'tool_result') {
+            const card = contentEl.querySelector(`#tool-${evt.tool_id}`);
+            if (card) {
+              card.classList.add(evt.success ? 'tool-result-success' : 'tool-result-error');
+              card.querySelector('.tool-card-header').innerHTML = `
+                <span> tool: ${evt.tool_name}</span>
+                <span>[${evt.success ? 'OK' : 'ERR'}]</span>
+              `;
+              card.querySelector('.tool-card-body').textContent = String(evt.output || evt.error);
+            }
+          }
+        });
+      }
+
+      // Render Markdown response
+      const mdText = msg.content || '';
+      const textDiv = document.createElement('div');
+      textDiv.className = 'markdown-rendered';
+      if (window.marked && typeof window.marked.parse === 'function') {
+        textDiv.innerHTML = marked.parse(mdText);
+      } else {
+        textDiv.textContent = mdText;
+      }
+      contentEl.appendChild(textDiv);
+
+      if (window.Prism) {
+        textDiv.querySelectorAll('pre code').forEach(block => Prism.highlightElement(block));
+      }
+    }
+  });
+
+  container.scrollTop = container.scrollHeight;
+}
+
+function startNewConversation() {
+  activeConversationId = null;
+  document.getElementById('activeThreadTitle').textContent = 'New Chat';
+  document.querySelectorAll('.conv-item').forEach(item => item.classList.remove('active'));
+  renderEmptySplash();
+  document.getElementById('promptInput')?.focus();
+}
+
+function renderEmptySplash() {
+  const container = document.getElementById('chatMessages');
+  container.innerHTML = `
+    <div class="nvim-splash" id="nvimSplash">
+      <pre class="ascii-banner">
+  ███████╗██╗   ██╗███╗   ██╗████████╗██████╗  █████╗ ██╗  ██╗
+  ██╔════╝╚██╗ ██╔╝████╗  ██║╚══██╔══╝██╔══██╗██╔══██╗██║ ██╔╝
+  ███████╗ ╚████╔╝ ██╔██╗ ██║   ██║   ██████╔╝███████║█████╔╝ 
+  ╚════██║  ╚██╔╝  ██║╚██╗██║   ██║   ██╔══██╗██╔══██║██╔═██╗ 
+  ███████║   ██║   ██║ ╚████║   ██║   ██║  ██║██║  ██║██║  ██╗
+  ╚══════╝   ╚═╝   ╚═╝  ╚═══╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝
+      </pre>
+      <div class="splash-meta">
+        <span>-- Autonomous Code Reviewer & Assistant --</span>
+        <span>type <kbd>:help</kbd> or <kbd>/</kbd> for command palette &bull; <kbd>:Review</kbd> to audit diff</span>
+      </div>
+      <div class="quick-commands-grid">
+        <div class="cmd-chip" onclick="sendQuickPrompt('/review')">
+          <span class="cmd-key">:Review</span>
+          <span class="cmd-desc">Run PR & diff quality audit</span>
+        </div>
+        <div class="cmd-chip" onclick="sendQuickPrompt('Analyze repository architecture and core components')">
+          <span class="cmd-key">:Inspect</span>
+          <span class="cmd-desc">Map module dependencies</span>
+        </div>
+        <div class="cmd-chip" onclick="sendQuickPrompt('Write pytest unit tests for key agent modules')">
+          <span class="cmd-key">:Test</span>
+          <span class="cmd-desc">Generate test suites</span>
+        </div>
+        <div class="cmd-chip" onclick="sendQuickPrompt('Scan codebase for security gaps and credential exposure')">
+          <span class="cmd-key">:Audit</span>
+          <span class="cmd-desc">Security & sanitize scan</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function promptRenameConversation(convId, currentTitle) {
+  const newTitle = prompt('Rename conversation title:', currentTitle);
+  if (newTitle && newTitle.trim() && newTitle.trim() !== currentTitle) {
+    updateConversationTitle(convId, newTitle.trim());
+  }
+}
+
+async function updateConversationTitle(convId, title) {
+  try {
+    const res = await fetch(`/api/conversations/${convId}`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ title })
+    });
+    if (res.ok) {
+      if (activeConversationId === convId) {
+        document.getElementById('activeThreadTitle').textContent = title;
+      }
+      loadConversations();
+      showToast('Conversation renamed.');
+    }
+  } catch (err) {
+    showToast(`Rename failed: ${err.message}`, 'error');
+  }
+}
+
+function enableTitleEdit() {
+  const titleEl = document.getElementById('activeThreadTitle');
+  if (!activeConversationId) return;
+
+  titleEl.contentEditable = 'true';
+  titleEl.focus();
+
+  const handleBlur = () => {
+    titleEl.contentEditable = 'false';
+    const newTitle = titleEl.textContent.trim();
+    if (newTitle) {
+      updateConversationTitle(activeConversationId, newTitle);
+    }
+    titleEl.removeEventListener('blur', handleBlur);
+  };
+
+  titleEl.addEventListener('blur', handleBlur);
+  titleEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      titleEl.blur();
+    }
+  });
+}
+
+async function deleteConversationById(convId) {
+  if (!confirm('Are you sure you want to delete this conversation?')) return;
+
+  try {
+    const res = await fetch(`/api/conversations/${convId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (res.ok) {
+      showToast('Conversation deleted.');
+      if (activeConversationId === convId) {
+        startNewConversation();
+      }
+      loadConversations();
+    }
+  } catch (err) {
+    showToast(`Delete failed: ${err.message}`, 'error');
+  }
+}
+
+function deleteCurrentActiveThread() {
+  if (activeConversationId) {
+    deleteConversationById(activeConversationId);
+  } else {
+    clearCurrentChat();
+  }
+}
+
+function clearCurrentChat() {
+  renderEmptySplash();
+  fetch('/api/clear', { method: 'POST' }).catch(() => {});
+  showToast(':clear Buffer reset.');
+}
+
+/* ==========================================================================
+   Theme Selector (:colorscheme)
+   ========================================================================== */
 function initThemeSelector() {
   const select = document.getElementById('themeSelect');
   const savedTheme = localStorage.getItem('syntrak_theme') || 'gruvbox';
@@ -43,7 +513,9 @@ function setTheme(themeName) {
   showToast(`:colorscheme ${theme}`);
 }
 
-/* Tab Navigation (Buffer switching) */
+/* ==========================================================================
+   Tab Navigation (Buffer switching)
+   ========================================================================== */
 function initTabs() {
   const tabBtns = document.querySelectorAll('.buffer-tab');
   tabBtns.forEach(btn => {
@@ -70,10 +542,14 @@ function switchTab(tabId) {
   }
 }
 
-/* Load Session Metadata */
+/* ==========================================================================
+   Session & Git Controls
+   ========================================================================== */
 async function loadSessionStatus() {
   try {
-    const res = await fetch('/api/session/status');
+    const res = await fetch('/api/session/status', {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) return;
     const data = await res.json();
 
@@ -82,12 +558,56 @@ async function loadSessionStatus() {
     document.getElementById('headerWorkspace').textContent = data.workspace_root.split('/').pop() || 'main';
     document.getElementById('cfgModel').value = data.model || '';
     document.getElementById('cfgApiBase').value = data.api_base || '';
+
+    initGoogleSignInButton(data.google_client_id);
+
+    if (data.user) {
+      renderUserProfile(data.user);
+    }
   } catch (err) {
     console.error('Failed to load session status:', err);
   }
 }
 
-/* Undo Action */
+function initGoogleSignInButton(clientId) {
+  const container = document.getElementById('googleSignInContainer');
+  if (!container) return;
+
+  if (!clientId) {
+    container.innerHTML = `
+      <div class="btn-setup-google" style="cursor: default;" title="Set GOOGLE_CLIENT_ID in .env file">
+        <i class="fa-brands fa-google"></i>
+        <span>Sign In (Set in .env)</span>
+      </div>
+    `;
+    return;
+  }
+
+  const tryRender = () => {
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+      container.innerHTML = '';
+      try {
+        google.accounts.id.initialize({
+          client_id: clientId,
+          callback: window.handleGoogleCredential
+        });
+        google.accounts.id.renderButton(container, {
+          theme: 'outline',
+          size: 'medium',
+          type: 'standard',
+          shape: 'rectangular'
+        });
+      } catch (gErr) {
+        console.warn('Google GIS render error:', gErr);
+      }
+    } else {
+      setTimeout(tryRender, 300);
+    }
+  };
+
+  tryRender();
+}
+
 async function handleUndo() {
   try {
     const res = await fetch('/api/undo', { method: 'POST' });
@@ -98,7 +618,6 @@ async function handleUndo() {
   }
 }
 
-/* Model Switch */
 async function handleConfigSave(e) {
   e.preventDefault();
   const model = document.getElementById('cfgModel').value.trim();
@@ -121,13 +640,9 @@ async function handleConfigSave(e) {
   }
 }
 
-function applyPreset(model, api_base, api_key) {
-  document.getElementById('cfgModel').value = model;
-  document.getElementById('cfgApiBase').value = api_base;
-  document.getElementById('cfgApiKey').value = api_key;
-}
-
-/* Chat & SSE Stream */
+/* ==========================================================================
+   Chat & SSE Stream Execution
+   ========================================================================== */
 function initChatForm() {
   const form = document.getElementById('chatForm');
   const input = document.getElementById('promptInput');
@@ -148,7 +663,7 @@ function initChatForm() {
     hideSlashPopup();
 
     if (query === '/clear' || query === ':clear') {
-      clearChat();
+      clearCurrentChat();
       return;
     }
     if (query === '/undo' || query === ':undo') {
@@ -210,6 +725,10 @@ function sendQuickPrompt(promptText) {
 }
 
 async function runQueryStream(query) {
+  // Remove splash screen if visible
+  const splash = document.getElementById('nvimSplash');
+  if (splash) splash.remove();
+
   appendUserMessage(query);
 
   const assistantMsgEl = createAssistantMessageElement();
@@ -222,8 +741,11 @@ async function runQueryStream(query) {
   try {
     const response = await fetch('/api/chat/stream', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query }),
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        query,
+        conversation_id: activeConversationId
+      }),
       signal: activeAbortController.signal
     });
 
@@ -251,9 +773,16 @@ async function runQueryStream(query) {
             const jsonStr = trimmed.substring(6);
             try {
               const event = JSON.parse(jsonStr);
-              handleAgentEvent(event, contentEl, accumulatedMarkdown, (newMd) => {
-                accumulatedMarkdown = newMd;
-              });
+
+              if (event.event_type === 'conversation_init') {
+                activeConversationId = event.conversation_id;
+                document.getElementById('activeThreadTitle').textContent = query.substring(0, 35);
+                loadConversations();
+              } else {
+                handleAgentEvent(event, contentEl, accumulatedMarkdown, (newMd) => {
+                  accumulatedMarkdown = newMd;
+                });
+              }
             } catch (e) {
               console.error('Failed to parse SSE JSON:', jsonStr, e);
             }
@@ -270,6 +799,7 @@ async function runQueryStream(query) {
   } finally {
     setGeneratingState(false);
     activeAbortController = null;
+    loadConversations();
   }
 }
 
@@ -277,17 +807,27 @@ function handleAgentEvent(event, contentEl, accumulatedMd, setMdCallback) {
   const messagesContainer = document.getElementById('chatMessages');
 
   if (event.event_type === 'token_stream') {
+    const cursor = contentEl.querySelector('.cursor-typing');
+    if (cursor) cursor.remove();
+
     const newMd = accumulatedMd + event.token;
     setMdCallback(newMd);
 
+    let textDiv = contentEl.querySelector('.markdown-rendered');
+    if (!textDiv) {
+      textDiv = document.createElement('div');
+      textDiv.className = 'markdown-rendered';
+      contentEl.appendChild(textDiv);
+    }
+
     if (window.marked && typeof window.marked.parse === 'function') {
-      contentEl.innerHTML = marked.parse(newMd);
+      textDiv.innerHTML = marked.parse(newMd);
     } else {
-      contentEl.textContent = newMd;
+      textDiv.textContent = newMd;
     }
 
     if (window.Prism) {
-      contentEl.querySelectorAll('pre code').forEach((block) => {
+      textDiv.querySelectorAll('pre code').forEach((block) => {
         Prism.highlightElement(block);
       });
     }
@@ -325,14 +865,17 @@ function handleAgentEvent(event, contentEl, accumulatedMd, setMdCallback) {
   }
 }
 
-/* Message DOM helpers */
+/* ==========================================================================
+   DOM & UI Helpers
+   ========================================================================== */
 function appendUserMessage(text) {
   const container = document.getElementById('chatMessages');
   const msg = document.createElement('div');
   msg.className = 'message user-message';
+  const nameLabel = currentUser?.name || 'enky';
   msg.innerHTML = `
     <div class="user-prompt-badge">
-      <span class="user-host">❯ enky@syntrak</span>
+      <span class="user-host">❯ ${escapeHtml(nameLabel)}@syntrak</span>
       <span class="user-branch">(main )</span>
       <span>$</span>
     </div>
@@ -367,20 +910,6 @@ function appendSystemNote(contentEl, text, type = 'info') {
   contentEl.appendChild(note);
 }
 
-function clearChat() {
-  const container = document.getElementById('chatMessages');
-  container.innerHTML = `
-    <div class="nvim-splash">
-      <div class="splash-meta">
-        <span>-- Buffer Cleared (:clear) --</span>
-        <span>Memory reset. Ready for new input.</span>
-      </div>
-    </div>
-  `;
-  fetch('/api/clear', { method: 'POST' }).catch(() => {});
-}
-
-/* Slash Command Menu */
 function initSlashPopup() {
   const input = document.getElementById('promptInput');
   const popup = document.getElementById('slashPopup');

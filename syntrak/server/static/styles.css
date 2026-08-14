@@ -306,6 +306,415 @@ select#themeSelect option {
   color: var(--text-dim);
 }
 
+.buffer-tab-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 100%;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border-muted);
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s ease;
+}
+
+.buffer-tab-toggle:hover {
+  background-color: var(--bg-surface);
+  color: var(--color-yellow);
+}
+
+.workspace-wrapper {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ==========================================================================
+   ChatGPT-Style Chat History Sidebar
+   ========================================================================== */
+.chat-sidebar {
+  width: 270px;
+  background-color: var(--bg-darkest);
+  border-right: 1px solid var(--border-muted);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  transition: width 0.22s ease, transform 0.22s ease, opacity 0.2s ease;
+  user-select: none;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.chat-sidebar.collapsed {
+  width: 0;
+  min-width: 0;
+  border-right: none;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.sidebar-top {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-muted);
+}
+
+.btn-new-chat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-muted);
+  border-radius: 6px;
+  color: var(--text-bright);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-new-chat:hover {
+  background: var(--bg-elevated);
+  border-color: var(--color-yellow);
+  color: var(--color-yellow);
+  transform: translateY(-1px);
+}
+
+.sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-editor);
+  border: 1px solid var(--border-muted);
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+
+.sidebar-search i {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.sidebar-search input {
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  outline: none;
+  width: 100%;
+}
+
+.sidebar-search input::placeholder {
+  color: var(--text-dim);
+}
+
+.conversations-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 2rem 1rem;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  text-align: center;
+}
+
+.conv-group-header {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: 8px 8px 4px;
+  letter-spacing: 0.5px;
+}
+
+.conv-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  border-radius: 5px;
+  color: var(--text-main);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.conv-item:hover {
+  background-color: var(--bg-surface);
+  color: var(--text-bright);
+}
+
+.conv-item.active {
+  background-color: var(--bg-elevated);
+  color: var(--color-yellow);
+  font-weight: 600;
+  border-left: 2px solid var(--color-yellow);
+}
+
+.conv-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.conv-item-left i {
+  font-size: 11px;
+  color: var(--color-cyan);
+  flex-shrink: 0;
+}
+
+.conv-item-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.conv-item-actions {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+}
+
+.conv-item:hover .conv-item-actions,
+.conv-item.active .conv-item-actions {
+  display: flex;
+}
+
+.btn-conv-action {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+  transition: color 0.12s ease;
+}
+
+.btn-conv-action:hover {
+  color: var(--color-red);
+}
+
+.btn-conv-edit:hover {
+  color: var(--color-yellow);
+}
+
+/* Sidebar Footer & Auth */
+.sidebar-footer {
+  padding: 10px;
+  background-color: var(--bg-darkest);
+  border-top: 1px solid var(--border-muted);
+}
+
+.auth-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+
+#googleSignInContainer {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.btn-setup-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-muted);
+  border-radius: 5px;
+  color: var(--text-bright);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-setup-google i {
+  color: var(--color-red);
+}
+
+.btn-setup-google:hover {
+  background: var(--bg-elevated);
+  border-color: var(--color-yellow);
+  color: var(--color-yellow);
+}
+
+.user-card {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-muted);
+  border-radius: 6px;
+}
+
+.user-avatar-wrap {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.user-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.user-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-highlight);
+  color: var(--color-yellow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  border-radius: 50%;
+}
+
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+}
+
+.user-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-email {
+  font-size: 10px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-logout {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  transition: color 0.15s ease;
+}
+
+.btn-logout:hover {
+  color: var(--color-red);
+}
+
+/* Chat Active Thread Bar */
+.chat-thread-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px;
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-muted);
+  height: 36px;
+}
+
+.thread-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.thread-icon {
+  color: var(--color-yellow);
+  font-size: 12px;
+}
+
+.thread-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-bright);
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  outline: none;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.thread-title[contenteditable="true"] {
+  background: var(--bg-darkest);
+  border: 1px solid var(--border-focus);
+}
+
+.btn-thread-edit, .btn-thread-action {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  transition: color 0.12s ease;
+}
+
+.btn-thread-edit:hover {
+  color: var(--color-yellow);
+}
+
+.btn-thread-action:hover {
+  color: var(--color-red);
+}
+
 /* ==========================================================================
    Editor Window Panes
    ========================================================================== */
@@ -745,54 +1154,6 @@ textarea#promptInput {
 
 .btn-nvim-save:hover {
   opacity: 0.9;
-}
-
-.nvim-presets {
-  margin-top: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-width: 700px;
-}
-
-.preset-title {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-dim);
-}
-
-.preset-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.p-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background-color: var(--bg-darkest);
-  border: 1px solid var(--border-muted);
-  border-radius: 3px;
-  padding: 8px 12px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.p-row:hover {
-  background-color: var(--bg-surface);
-  border-color: var(--color-yellow);
-}
-
-.p-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-bright);
-}
-
-.p-url {
-  font-size: 11.5px;
-  color: var(--text-dim);
 }
 
 .empty-buffer {
