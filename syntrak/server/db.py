@@ -1,6 +1,7 @@
 """SQLite database persistence for Syntrak Web Server."""
 
 import json
+import os
 import sqlite3
 import uuid
 from datetime import datetime, timezone
@@ -9,7 +10,24 @@ from typing import Any, Dict, List, Optional
 
 
 def get_db_path() -> Path:
-    """Get path to ~/.syntrak/syntrak.db."""
+    """Get path to database from environment variables or default to ~/.syntrak/syntrak.db."""
+    db_env = (
+        os.getenv("DATABASE_URL")
+        or os.getenv("SQL_DATABASE_URL")
+        or os.getenv("DATABASE_PATH")
+        or os.getenv("SQL_DATABASE_PATH")
+        or os.getenv("SYNTRAK_DATABASE_PATH")
+    )
+    if db_env:
+        # Strip sqlite URI prefix if present
+        if db_env.startswith("sqlite:///"):
+            db_env = db_env[len("sqlite:///"):]
+        elif db_env.startswith("sqlite://"):
+            db_env = db_env[len("sqlite://"):]
+        p = Path(db_env).expanduser()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        return p
+
     db_dir = Path.home() / ".syntrak"
     db_dir.mkdir(parents=True, exist_ok=True)
     return db_dir / "syntrak.db"
