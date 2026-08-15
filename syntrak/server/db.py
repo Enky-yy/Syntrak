@@ -243,10 +243,27 @@ class Database:
         db_path: Optional[Union[str, Path]] = None,
         db_url: Optional[str] = None,
     ):
-        self.db_url = get_db_url(db_path=db_path, db_url=db_url)
-        connect_args = {"check_same_thread": False} if self.db_url.startswith("sqlite") else {}
+        target_url = get_db_url(db_path=db_path, db_url=db_url)
+        self.db_url = target_url
+        try:
+            self._setup_engine(self.db_url)
+            self.init_db()
+        except Exception as e:
+            # Fallback to local SQLite if remote DB driver is missing or connection fails
+            if not self.db_url.startswith("sqlite"):
+                fallback_path = get_db_path().resolve()
+                fallback_url = f"sqlite:///{fallback_path}"
+                print(f"Warning: Failed to connect to database at {self.db_url} ({e}). Falling back to local SQLite at {fallback_url}")
+                self.db_url = fallback_url
+                self._setup_engine(self.db_url)
+                self.init_db()
+            else:
+                raise
+
+    def _setup_engine(self, url: str):
+        connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
         self.engine: Engine = create_engine(
-            self.db_url,
+            url,
             connect_args=connect_args,
             pool_pre_ping=True,
         )
@@ -255,7 +272,6 @@ class Database:
             autoflush=False,
             expire_on_commit=False,
         )
-        self.init_db()
 
     def init_db(self):
         """Create database tables if they do not exist."""
