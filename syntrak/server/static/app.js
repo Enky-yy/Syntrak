@@ -375,36 +375,7 @@ function renderConversationMessages(messages) {
       const thinking = contentEl.querySelector('.thinking-indicator');
       if (thinking) thinking.remove();
 
-      // Render historical tool executions if available
-      if (msg.events && msg.events.length > 0) {
-        msg.events.forEach(evt => {
-          if (evt.event_type === 'tool_start') {
-            const card = document.createElement('div');
-            card.className = 'tool-card';
-            card.id = `tool-${evt.tool_id}`;
-            card.innerHTML = `
-              <div class="tool-card-header">
-                <span> tool: ${evt.tool_name}</span>
-                <span>[COMPLETED]</span>
-              </div>
-              <div class="tool-card-body">${escapeHtml(JSON.stringify(evt.arguments, null, 2))}</div>
-            `;
-            contentEl.appendChild(card);
-          } else if (evt.event_type === 'tool_result') {
-            const card = contentEl.querySelector(`#tool-${evt.tool_id}`);
-            if (card) {
-              card.classList.add(evt.success ? 'tool-result-success' : 'tool-result-error');
-              card.querySelector('.tool-card-header').innerHTML = `
-                <span> tool: ${evt.tool_name}</span>
-                <span>[${evt.success ? 'OK' : 'ERR'}]</span>
-              `;
-              card.querySelector('.tool-card-body').textContent = String(evt.output || evt.error || '');
-            }
-          }
-        });
-      }
-
-      // Render Markdown response
+      // Render Markdown response cleanly without raw tool dumps
       const mdText = msg.content || '';
       const textDiv = document.createElement('div');
       textDiv.className = 'markdown-rendered';
@@ -1089,41 +1060,13 @@ function handleAgentEvent(event, contentEl, accumulatedMd, setMdCallback) {
       });
     }
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
-  } else if (event.event_type === 'agent_status') {
-    let thinking = contentEl.querySelector('.thinking-indicator');
-    if (!thinking && !contentEl.querySelector('.markdown-rendered')) {
-      thinking = document.createElement('div');
+  } else if (event.event_type === 'agent_status' || event.event_type === 'tool_start' || event.event_type === 'tool_result' || event.event_type === 'thought_stream') {
+    // Keep the clean thinking... indicator active throughout processing
+    if (!contentEl.querySelector('.markdown-rendered') && !contentEl.querySelector('.thinking-indicator')) {
+      const thinking = document.createElement('div');
       thinking.className = 'thinking-indicator';
+      thinking.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> <span>thinking...</span>`;
       contentEl.appendChild(thinking);
-    }
-    if (thinking) {
-      thinking.innerHTML = `<i class="fa-solid fa-gear fa-spin"></i> <span>[step ${event.step || 1}/${event.max_steps || 25}] Executing reasoning & tools...</span>`;
-    }
-  } else if (event.event_type === 'tool_start') {
-    const thinking = contentEl.querySelector('.thinking-indicator');
-    if (thinking) thinking.remove();
-
-    const card = document.createElement('div');
-    card.className = 'tool-card';
-    card.id = `tool-${event.tool_id}`;
-    card.innerHTML = `
-      <div class="tool-card-header">
-        <span> tool: ${event.tool_name}</span>
-        <span><i class="fa-solid fa-spinner fa-spin"></i> [RUNNING]</span>
-      </div>
-      <div class="tool-card-body">${escapeHtml(JSON.stringify(event.arguments, null, 2))}</div>
-    `;
-    contentEl.appendChild(card);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-  } else if (event.event_type === 'tool_result') {
-    const card = contentEl.querySelector(`#tool-${event.tool_id}`);
-    if (card) {
-      card.classList.add(event.success ? 'tool-result-success' : 'tool-result-error');
-      card.querySelector('.tool-card-header').innerHTML = `
-        <span> tool: ${event.tool_name}</span>
-        <span>[${event.success ? 'OK' : 'ERR'}]</span>
-      `;
-      card.querySelector('.tool-card-body').textContent = String(event.output || event.error || '(no output)');
     }
   } else if (event.event_type === 'error') {
     const thinking = contentEl.querySelector('.thinking-indicator');
