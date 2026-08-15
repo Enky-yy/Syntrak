@@ -56,9 +56,21 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
         version="0.1.0"
     )
 
+    allowed_origins_env = os.getenv("SYNTRAK_ALLOWED_ORIGINS", "")
+    if allowed_origins_env:
+        allowed_origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
+    else:
+        allowed_origins = [
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+            "http://localhost:9000",
+            "http://127.0.0.1:9000",
+            "https://syntrak.harsh-shah.me"
+        ]
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -93,9 +105,10 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
         response.set_cookie(
             key="syntrak_token",
             value=token,
-            httponly=False,
+            httponly=True,
             max_age=86400 * 30,
-            samesite="lax"
+            samesite="lax",
+            secure=bool(os.getenv("PRODUCTION", False))
         )
         return AuthResponse(
             token=token,
@@ -110,7 +123,7 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
     @app.post("/api/auth/logout")
     async def auth_logout(response: Response):
         """Log out user and clear session cookie."""
-        response.delete_cookie(key="syntrak_token", path="/")
+        response.delete_cookie(key="syntrak_token", path="/", httponly=True)
         return {"status": "success", "message": "Logged out successfully"}
 
     @app.get("/api/auth/me", response_model=UserResponse)
@@ -328,6 +341,9 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
                         err_msg = err_msg.replace(token, "***")
                     raise HTTPException(status_code=400, detail=f"Failed to clone GitHub repository: {err_msg}")
 
+        # Sanitize remote origin URL so tokens are never persisted in .git/config
+        subprocess.run(["git", "remote", "set-url", "origin", cleaned_url], cwd=str(target_repo_dir), capture_output=True, text=True, check=False)
+
         session.set_workspace(str(target_repo_dir))
         session.has_connected_repo = True
         actual_branch = git_get_branch(cwd=str(target_repo_dir)) or branch
@@ -353,9 +369,11 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
             new_conv = database.create_conversation(user_id=user["id"], title=first_title, mode=req.mode or "chat")
             conv_id = new_conv["id"]
         else:
-            # If current title is default, auto-update to query title
+            # Verify ownership of existing conversation thread to prevent IDOR
             curr = database.get_conversation(conv_id, user_id=user["id"])
-            if curr and curr["title"] in ("New Chat", "New Agent Session"):
+            if not curr:
+                raise HTTPException(status_code=404, detail="Conversation not found or unauthorized.")
+            if curr["title"] in ("New Chat", "New Agent Session"):
                 new_title = req.query.strip().split("\n")[0][:35]
                 database.update_conversation_title(conv_id, new_title, user_id=user["id"])
 

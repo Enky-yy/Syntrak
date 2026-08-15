@@ -7,16 +7,19 @@ from typing import Dict, List, Optional
 from syntrak.tools.base import default_registry
 
 
-BLOCKED_PATTERNS = [
-    "rm -rf /",
-    "mkfs",
-    ":(){ :|:& };:",
-    "dd if=/dev",
-    "> /dev/sda",
-    "> /dev/nvme",
-    "shutdown",
-    "reboot",
-    "init 0"
+import re
+
+BLOCKED_COMMAND_REGEXES = [
+    r"(?i)\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*)\s+(/|/\*|--no-preserve-root)\b",
+    r"(?i)\bmkfs(\.\w+)?\b",
+    r":\(\)\{\s*:\|:&\s*\};:",
+    r"(?i)\bdd\s+if=/dev/(zero|urandom|random|null)\s+of=/dev/",
+    r"(?i)>\s*/dev/(sd[a-z]|nvme\d+n\d+|hd[a-z])",
+    r"(?i)\b(shutdown|reboot|poweroff|halt|init\s+0)\b",
+    r"(?i)\bchmod\s+(-R\s+)?(777|000)\s+/\b",
+    r"(?i)\bchown\s+(-R\s+)?\w+\s+/\b",
+    r"(?i)\bcurl\s+[^|]+\|\s*(ba|z|da|k|t?c)?sh\b",
+    r"(?i)\bwget\s+[^|]+\|\s*(ba|z|da|k|t?c)?sh\b",
 ]
 
 
@@ -26,9 +29,9 @@ BLOCKED_PATTERNS = [
 )
 async def execute_command(command: str, timeout_seconds: int = 60, cwd: Optional[str] = None) -> str:
     """Run a shell command asynchronously and return its combined stdout and stderr."""
-    for pattern in BLOCKED_PATTERNS:
-        if pattern in command:
-            return f"Security Violation: Command '{command}' was blocked due to dangerous pattern '{pattern}'."
+    for pattern in BLOCKED_COMMAND_REGEXES:
+        if re.search(pattern, command):
+            return f"Security Violation: Command '{command}' was blocked due to dangerous pattern matching."
 
     # Safeguard working directory: fall back to current working dir if passed path does not exist
     if cwd and os.path.isdir(cwd):

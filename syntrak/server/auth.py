@@ -15,13 +15,15 @@ GUEST_USER_ID = "guest-developer"
 
 
 async def verify_google_credential(credential: str) -> Dict[str, Any]:
-    """Verify a Google ID token from Google Identity Services."""
-    # First attempt: Google tokeninfo endpoint
+    """Cryptographically verify a Google ID token via Google's tokeninfo service."""
+    if not credential or not credential.strip():
+        raise HTTPException(status_code=401, detail="Missing Google ID token credential.")
+
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(
                 "https://oauth2.googleapis.com/tokeninfo",
-                params={"id_token": credential}
+                params={"id_token": credential.strip()}
             )
             if resp.status_code == 200:
                 payload = resp.json()
@@ -29,31 +31,30 @@ async def verify_google_credential(credential: str) -> Dict[str, Any]:
                 if GOOGLE_CLIENT_ID and payload.get("aud") != GOOGLE_CLIENT_ID:
                     raise HTTPException(status_code=401, detail="Google token client ID mismatch.")
 
+                # Ensure issuer is genuine Google
+                iss = payload.get("iss", "")
+                if iss not in ("accounts.google.com", "https://accounts.google.com"):
+                    raise HTTPException(status_code=401, detail="Invalid Google token issuer.")
+
                 return {
                     "id": f"google_{payload['sub']}",
                     "email": payload.get("email", ""),
                     "name": payload.get("name", "Google User"),
                     "picture": payload.get("picture", "")
                 }
+            else:
+                err_detail = "Failed to verify Google token with identity provider."
+                try:
+                    err_json = resp.json()
+                    if "error_description" in err_json:
+                        err_detail = f"Google verification error: {err_json['error_description']}"
+                except Exception:
+                    pass
+                raise HTTPException(status_code=401, detail=err_detail)
     except HTTPException:
         raise
     except Exception as e:
-        pass
-
-    # Fallback to local decoding if Google client verification is simulated/offline
-    try:
-        unverified = jwt.decode(credential, options={"verify_signature": False})
-        if "sub" in unverified:
-            return {
-                "id": f"google_{unverified['sub']}",
-                "email": unverified.get("email", ""),
-                "name": unverified.get("name", "Google User"),
-                "picture": unverified.get("picture", "")
-            }
-    except Exception:
-        pass
-
-    raise HTTPException(status_code=401, detail="Invalid Google ID token.")
+        raise HTTPException(status_code=401, detail=f"Google authentication service error: {str(e)}")
 
 
 def create_jwt_token(user_data: Dict[str, Any]) -> str:

@@ -9,11 +9,21 @@ from syntrak.tools.base import default_registry
 
 def _resolve_path(path_str: str) -> Path:
     p = Path(path_str).expanduser()
-    if p.is_absolute():
-        return p.resolve()
     ws = os.environ.get("SYNTRAK_WORKSPACE_ROOT")
     if ws:
-        return (Path(ws).expanduser() / p).resolve()
+        ws_path = Path(ws).expanduser().resolve()
+        if p.is_absolute():
+            resolved = p.resolve()
+        else:
+            resolved = (ws_path / p).resolve()
+
+        # Enforce strict boundary containment within authorized workspace root
+        try:
+            resolved.relative_to(ws_path)
+        except ValueError:
+            raise PermissionError(f"Access denied: Path '{path_str}' is outside the authorized workspace directory '{ws_path}'.")
+        return resolved
+
     return p.resolve()
 
 
@@ -23,7 +33,11 @@ def _resolve_path(path_str: str) -> Path:
 )
 def read_file(file_path: str, start_line: Optional[int] = None, end_line: Optional[int] = None) -> str:
     """Read the contents of a file, optionally within a line range (1-indexed)."""
-    path = _resolve_path(file_path)
+    try:
+        path = _resolve_path(file_path)
+    except PermissionError as pe:
+        return f"Security Violation: {str(pe)}"
+
     if not path.is_file():
         return f"Error: File '{file_path}' does not exist."
 
@@ -59,7 +73,11 @@ def read_file(file_path: str, start_line: Optional[int] = None, end_line: Option
 )
 def write_file(file_path: str, content: str, overwrite: bool = True) -> str:
     """Write content to a file. Automatically creates parent directories."""
-    path = _resolve_path(file_path)
+    try:
+        path = _resolve_path(file_path)
+    except PermissionError as pe:
+        return f"Security Violation: {str(pe)}"
+
     if path.exists() and not overwrite:
         return f"Error: File '{file_path}' already exists and overwrite is set to False."
 
@@ -78,7 +96,11 @@ def write_file(file_path: str, content: str, overwrite: bool = True) -> str:
 )
 def replace_in_file(file_path: str, target_content: str, replacement_content: str) -> str:
     """Search for target_content in file and replace it with replacement_content."""
-    path = _resolve_path(file_path)
+    try:
+        path = _resolve_path(file_path)
+    except PermissionError as pe:
+        return f"Security Violation: {str(pe)}"
+
     if not path.is_file():
         return f"Error: File '{file_path}' does not exist."
 
@@ -139,7 +161,11 @@ def replace_in_file(file_path: str, target_content: str, replacement_content: st
 )
 def list_directory(dir_path: str = ".", recursive: bool = False, max_depth: int = 2) -> str:
     """List directory contents."""
-    path = _resolve_path(dir_path)
+    try:
+        path = _resolve_path(dir_path)
+    except PermissionError as pe:
+        return f"Security Violation: {str(pe)}"
+
     if not path.is_dir():
         return f"Error: Path '{dir_path}' is not a directory."
 
@@ -188,7 +214,11 @@ def list_directory(dir_path: str = ".", recursive: bool = False, max_depth: int 
 )
 def search_files(query: str, dir_path: str = ".", file_pattern: Optional[str] = None) -> str:
     """Search for string or pattern in files."""
-    path = _resolve_path(dir_path)
+    try:
+        path = _resolve_path(dir_path)
+    except PermissionError as pe:
+        return f"Security Violation: {str(pe)}"
+
     if not path.is_dir():
         return f"Error: Directory '{dir_path}' not found."
 
