@@ -7,15 +7,26 @@ from typing import Dict, List, Optional
 from syntrak.tools.base import default_registry
 
 
+def _resolve_path(path_str: str) -> Path:
+    p = Path(path_str).expanduser()
+    if p.is_absolute():
+        return p.resolve()
+    ws = os.environ.get("SYNTRAK_WORKSPACE_ROOT")
+    if ws:
+        return (Path(ws).expanduser() / p).resolve()
+    return p.resolve()
+
+
 @default_registry.register(
     name="read_file",
     description="Read content of a file with optional line ranges."
 )
 def read_file(file_path: str, start_line: Optional[int] = None, end_line: Optional[int] = None) -> str:
     """Read the contents of a file, optionally within a line range (1-indexed)."""
-    path = Path(file_path).resolve()
+    path = _resolve_path(file_path)
     if not path.is_file():
         return f"Error: File '{file_path}' does not exist."
+
 
     try:
         with open(path, "r", encoding="utf-8", errors="replace") as f:
@@ -48,7 +59,7 @@ def read_file(file_path: str, start_line: Optional[int] = None, end_line: Option
 )
 def write_file(file_path: str, content: str, overwrite: bool = True) -> str:
     """Write content to a file. Automatically creates parent directories."""
-    path = Path(file_path).resolve()
+    path = _resolve_path(file_path)
     if path.exists() and not overwrite:
         return f"Error: File '{file_path}' already exists and overwrite is set to False."
 
@@ -67,7 +78,7 @@ def write_file(file_path: str, content: str, overwrite: bool = True) -> str:
 )
 def replace_in_file(file_path: str, target_content: str, replacement_content: str) -> str:
     """Search for target_content in file and replace it with replacement_content."""
-    path = Path(file_path).resolve()
+    path = _resolve_path(file_path)
     if not path.is_file():
         return f"Error: File '{file_path}' does not exist."
 
@@ -128,7 +139,7 @@ def replace_in_file(file_path: str, target_content: str, replacement_content: st
 )
 def list_directory(dir_path: str = ".", recursive: bool = False, max_depth: int = 2) -> str:
     """List directory contents."""
-    path = Path(dir_path).resolve()
+    path = _resolve_path(dir_path)
     if not path.is_dir():
         return f"Error: Path '{dir_path}' is not a directory."
 
@@ -177,7 +188,7 @@ def list_directory(dir_path: str = ".", recursive: bool = False, max_depth: int 
 )
 def search_files(query: str, dir_path: str = ".", file_pattern: Optional[str] = None) -> str:
     """Search for string or pattern in files."""
-    path = Path(dir_path).resolve()
+    path = _resolve_path(dir_path)
     if not path.is_dir():
         return f"Error: Directory '{dir_path}' not found."
 

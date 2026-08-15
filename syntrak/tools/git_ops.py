@@ -8,7 +8,7 @@ from syntrak.tools.base import default_registry
 
 def _run_git(args: List[str], cwd: Optional[str] = None) -> str:
     import subprocess
-    work_dir = cwd or os.getcwd()
+    work_dir = cwd or os.environ.get("SYNTRAK_WORKSPACE_ROOT") or os.getcwd()
     try:
         res = subprocess.run(
             ["git"] + args,
@@ -90,3 +90,20 @@ def create_git_snapshot(description: str = "auto-checkpoint") -> Optional[str]:
         return None
     res = _run_git(["stash", "create", description])
     return res if res else None
+
+
+def git_get_remote_url(cwd: Optional[str] = None) -> Optional[str]:
+    """Get remote origin URL if available."""
+    res = _run_git(["remote", "get-url", "origin"], cwd=cwd)
+    if "Git error" in res or "not found" in res or "fatal" in res:
+        return None
+    return res.strip() or None
+
+
+def git_get_branch(cwd: Optional[str] = None) -> Optional[str]:
+    """Get current active branch name."""
+    res = _run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=cwd)
+    if "Git error" in res or "not found" in res or "fatal" in res:
+        return None
+    return res.strip() or None
+

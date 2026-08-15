@@ -34,7 +34,7 @@ async def execute_command(command: str, timeout_seconds: int = 60, cwd: Optional
     if cwd and os.path.isdir(cwd):
         working_dir = cwd
     else:
-        working_dir = os.getcwd()
+        working_dir = os.environ.get("SYNTRAK_WORKSPACE_ROOT") or os.getcwd()
 
     try:
         proc = await asyncio.create_subprocess_shell(

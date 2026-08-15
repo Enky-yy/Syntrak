@@ -1,7 +1,7 @@
 """Session manager coordinating Agent, Memory, Tools, and Configuration."""
 
 import subprocess
-from typing import AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional
 from syntrak.config import SyntrakConfig
 from syntrak.core.agent import AgentRunner
 from syntrak.core.events import BaseEvent
@@ -19,7 +19,10 @@ class SessionManager:
     """Manages an active Syntrak coding & review session."""
 
     def __init__(self, config: Optional[SyntrakConfig] = None):
+        import os
         self.config = config or SyntrakConfig.load()
+        if self.config.workspace_root:
+            os.environ["SYNTRAK_WORKSPACE_ROOT"] = str(self.config.workspace_root)
         self.registry: ToolRegistry = default_registry
         self.memory: MemoryManager = MemoryManager(
             context_limit=self.config.llm.context_window
@@ -32,6 +35,26 @@ class SessionManager:
             max_steps=self.config.max_agent_steps
         )
         self.undo_stack: List[str] = []
+
+    def set_workspace(self, workspace_root: str):
+        """Switch active workspace directory for all tools and repository maps."""
+        import os
+        self.config.workspace_root = workspace_root
+        os.environ["SYNTRAK_WORKSPACE_ROOT"] = str(workspace_root)
+        self.reset_memory()
+
+    def reset_memory(self):
+        """Clear in-memory conversation buffer."""
+        self.memory.clear()
+
+    def sync_conversation_history(self, db_messages: List[Dict[str, Any]]):
+        """Sync in-memory agent messages with historical messages from database."""
+        self.memory.clear()
+        for msg in db_messages:
+            role = msg.get("role")
+            content = msg.get("content")
+            if role in ("user", "assistant", "system") and content:
+                self.memory.add_message(role=role, content=content)
 
     def set_model(self, model_name: str, api_base: Optional[str] = None, api_key: Optional[str] = None):
         """Switch active model and provider."""
@@ -83,17 +106,28 @@ class SessionManager:
     async def execute_query(
         self,
         query: str,
-        custom_instructions: Optional[str] = None
+        custom_instructions: Optional[str] = None,
+        mode: str = "chat",
+        repo_authorized: bool = False
     ) -> AsyncGenerator[BaseEvent, None]:
-        """Execute a user query through the agent with fresh system prompt."""
-        if self.config.enable_git_snapshots:
+        """Execute a user query through the agent or chat assistant with appropriate system prompt and tools."""
+        enable_tools = (mode == "agent" and repo_authorized)
+
+        if enable_tools and self.config.enable_git_snapshots:
             self.save_checkpoint(f"Pre-query: {query[:30]}")
 
         sys_prompt = build_system_prompt(
             config=self.config,
             registry=self.registry,
-            custom_instructions=custom_instructions
+            custom_instructions=custom_instructions,
+            mode=mode,
+            repo_authorized=repo_authorized
         )
 
-        async for event in self.agent.run(user_query=query, system_prompt=sys_prompt):
+        async for event in self.agent.run(
+            user_query=query,
+            system_prompt=sys_prompt,
+            enable_tools=enable_tools
+        ):
             yield event
+

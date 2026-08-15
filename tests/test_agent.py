@@ -66,3 +66,34 @@ async def test_agent_react_loop():
     assert "tool_start" in event_types
     assert "tool_result" in event_types
     assert "done" in event_types
+
+
+@pytest.mark.asyncio
+async def test_agent_chat_mode_no_tools():
+    registry = ToolRegistry()
+
+    @registry.register(name="mock_tool", description="Mock tool for testing")
+    def mock_tool(param: str) -> str:
+        return f"Result for {param}"
+
+    mem = MemoryManager()
+    
+    class PureChatMockLLM(BaseLLMClient):
+        async def stream_chat(self, messages, tools=None, temperature=0.2, max_tokens=4096):
+            assert tools is None, "Tools should not be passed in pure chat mode!"
+            yield LLMResponseChunk(delta_text="Hello! I am answering directly like ChatGPT.")
+            yield LLMResponseChunk(is_done=True, tool_calls=[], finish_reason="stop")
+
+    mock_llm = PureChatMockLLM()
+    agent = AgentRunner(llm_client=mock_llm, tool_registry=registry, memory_manager=mem)
+
+    events = []
+    async for ev in agent.run(user_query="Hello AI", enable_tools=False):
+        events.append(ev)
+
+    event_types = [e.event_type.value for e in events]
+    assert "token_stream" in event_types
+    assert "tool_start" not in event_types
+    assert "tool_result" not in event_types
+    assert "done" in event_types
+

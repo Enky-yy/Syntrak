@@ -7,6 +7,9 @@ let activeAbortController = null;
 let activeConversationId = null;
 let conversationsCache = [];
 let currentUser = null;
+let currentChatMode = localStorage.getItem('syntrak_chat_mode') || 'chat';
+let activeSidebarMode = localStorage.getItem('syntrak_chat_mode') || 'chat';
+let isRepoAuthorized = localStorage.getItem('syntrak_repo_authorized') === 'true';
 
 document.addEventListener('DOMContentLoaded', () => {
   initThemeSelector();
@@ -15,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSlashPopup();
   initChatForm();
   initAuth();
+  initModeSwitcher();
   loadSessionStatus();
   loadConversations();
 
@@ -147,6 +151,53 @@ function initSidebar() {
     const query = e.target.value.toLowerCase();
     filterConversations(query);
   });
+
+  const sideTabChat = document.getElementById('sideTabChat');
+  const sideTabAgent = document.getElementById('sideTabAgent');
+
+  sideTabChat?.addEventListener('click', () => {
+    switchSidebarMode('chat', true);
+  });
+
+  sideTabAgent?.addEventListener('click', () => {
+    switchSidebarMode('agent', true);
+  });
+}
+
+function shiftToMostRecentConversation(mode) {
+  const targetMode = mode || currentChatMode || 'chat';
+  const modeConvs = (conversationsCache || []).filter(c => (c.mode || 'chat') === targetMode);
+  if (modeConvs.length > 0) {
+    if (activeConversationId !== modeConvs[0].id) {
+      selectConversation(modeConvs[0].id, false);
+    }
+  } else {
+    startNewConversation(targetMode);
+  }
+}
+
+function switchSidebarMode(mode, syncMain = true) {
+  activeSidebarMode = mode;
+  const sideTabChat = document.getElementById('sideTabChat');
+  const sideTabAgent = document.getElementById('sideTabAgent');
+  const btnNewChatLabel = document.getElementById('btnNewChatLabel');
+
+  if (mode === 'chat') {
+    sideTabChat?.classList.add('active');
+    sideTabAgent?.classList.remove('active');
+    if (btnNewChatLabel) btnNewChatLabel.textContent = 'New Chat';
+  } else {
+    sideTabAgent?.classList.add('active');
+    sideTabChat?.classList.remove('active');
+    if (btnNewChatLabel) btnNewChatLabel.textContent = 'New Session';
+  }
+
+  if (syncMain && typeof setChatMode === 'function') {
+    setChatMode(mode, false);
+  }
+
+  renderConversationGroups(conversationsCache);
+  startNewConversation(mode);
 }
 
 function toggleSidebar() {
@@ -177,11 +228,17 @@ function renderConversationGroups(conversations) {
 
   listContainer.innerHTML = '';
 
-  if (!conversations || conversations.length === 0) {
+  const currentMode = activeSidebarMode || 'chat';
+  const modeFiltered = (conversations || []).filter(c => {
+    const cMode = c.mode || 'chat';
+    return cMode === currentMode;
+  });
+
+  if (!modeFiltered || modeFiltered.length === 0) {
     listContainer.innerHTML = `
       <div class="sidebar-empty-state">
-        <i class="fa-regular fa-comments"></i>
-        <span>No conversations yet</span>
+        <i class="${currentMode === 'agent' ? 'fa-solid fa-bolt' : 'fa-regular fa-comments'}"></i>
+        <span>No ${currentMode === 'agent' ? 'agent sessions' : 'conversations'} yet</span>
       </div>
     `;
     return;
@@ -198,7 +255,7 @@ function renderConversationGroups(conversations) {
   const now = new Date();
   const oneDay = 24 * 60 * 60 * 1000;
 
-  conversations.forEach(conv => {
+  modeFiltered.forEach(conv => {
     const date = new Date(conv.updated_at || conv.created_at);
     const diffDays = Math.floor((now - date) / oneDay);
 
@@ -226,9 +283,11 @@ function renderConversationGroups(conversations) {
       item.className = `conv-item ${conv.id === activeConversationId ? 'active' : ''}`;
       item.id = `conv-${conv.id}`;
 
+      const iconClass = conv.mode === 'agent' ? 'fa-solid fa-bolt agent-icon' : 'fa-regular fa-message';
+
       item.innerHTML = `
         <div class="conv-item-left">
-          <i class="fa-regular fa-message"></i>
+          <i class="${iconClass}"></i>
           <span class="conv-item-title" title="${escapeHtml(conv.title)}">${escapeHtml(conv.title)}</span>
         </div>
         <div class="conv-item-actions">
@@ -265,9 +324,14 @@ function filterConversations(query) {
   renderConversationGroups(filtered);
 }
 
-async function selectConversation(convId) {
+async function selectConversation(convId, syncMode = true) {
   activeConversationId = convId;
   switchTab('tabChat');
+
+  const selectedConv = (conversationsCache || []).find(c => c.id === convId);
+  if (selectedConv && selectedConv.mode && syncMode && selectedConv.mode !== currentChatMode) {
+    setChatMode(selectedConv.mode, true, false);
+  }
 
   // Update active styling in sidebar
   document.querySelectorAll('.conv-item').forEach(item => {
@@ -306,8 +370,12 @@ function renderConversationMessages(messages) {
     } else if (msg.role === 'assistant') {
       const msgEl = createAssistantMessageElement();
       const contentEl = msgEl.querySelector('.message-content');
-      
-      // Render historical thoughts and tools if available
+      const cursor = contentEl.querySelector('.cursor-typing');
+      if (cursor) cursor.remove();
+      const thinking = contentEl.querySelector('.thinking-indicator');
+      if (thinking) thinking.remove();
+
+      // Render historical tool executions if available
       if (msg.events && msg.events.length > 0) {
         msg.events.forEach(evt => {
           if (evt.event_type === 'tool_start') {
@@ -330,7 +398,7 @@ function renderConversationMessages(messages) {
                 <span> tool: ${evt.tool_name}</span>
                 <span>[${evt.success ? 'OK' : 'ERR'}]</span>
               `;
-              card.querySelector('.tool-card-body').textContent = String(evt.output || evt.error);
+              card.querySelector('.tool-card-body').textContent = String(evt.output || evt.error || '');
             }
           }
         });
@@ -356,9 +424,13 @@ function renderConversationMessages(messages) {
   container.scrollTop = container.scrollHeight;
 }
 
-function startNewConversation() {
+function startNewConversation(mode) {
+  const targetMode = mode || currentChatMode || 'chat';
   activeConversationId = null;
-  document.getElementById('activeThreadTitle').textContent = 'New Chat';
+  const titleEl = document.getElementById('activeThreadTitle');
+  if (titleEl) {
+    titleEl.textContent = targetMode === 'agent' ? 'New Session' : 'New Chat';
+  }
   document.querySelectorAll('.conv-item').forEach(item => item.classList.remove('active'));
   renderEmptySplash();
   document.getElementById('promptInput')?.focus();
@@ -543,6 +615,175 @@ function switchTab(tabId) {
 }
 
 /* ==========================================================================
+   Mode Switcher (ChatGPT Chat vs Repo Agent) & Repository Authorization
+   ========================================================================== */
+function initModeSwitcher() {
+  const btnChat = document.getElementById('btnModeChat');
+  const btnAgent = document.getElementById('btnModeAgent');
+  const repoBadge = document.getElementById('repoBadgeStatus');
+  const modal = document.getElementById('repoAuthModal');
+  const btnCloseModal = document.getElementById('btnCloseRepoModal');
+  const btnCancelAuth = document.getElementById('btnCancelRepoAuth');
+  const btnConnectRepo = document.getElementById('btnConnectRepo');
+
+  function updateModeUI() {
+    const stlMode = document.getElementById('stlMode');
+    const stlArrow1 = document.getElementById('stlArrow1');
+    const promptInput = document.getElementById('promptInput');
+    const repoBadgeText = document.getElementById('repoBadgeText');
+
+    if (currentChatMode === 'chat') {
+      btnChat?.classList.add('active');
+      btnAgent?.classList.remove('active', 'agent-active');
+      if (stlMode) {
+        stlMode.textContent = 'CHAT';
+        stlMode.className = 'stl-mode chat';
+      }
+      if (stlArrow1) {
+        stlArrow1.className = 'stl-arrow-1 chat';
+      }
+      if (promptInput) {
+        promptInput.placeholder = 'Ask anything in Chat mode, or switch to Agent mode for repo coding...';
+      }
+    } else {
+      btnAgent?.classList.add('active', 'agent-active');
+      btnChat?.classList.remove('active');
+      if (stlMode) {
+        stlMode.textContent = 'AGENT';
+        stlMode.className = 'stl-mode agent';
+      }
+      if (stlArrow1) {
+        stlArrow1.className = 'stl-arrow-1 agent';
+      }
+      if (promptInput) {
+        promptInput.placeholder = 'Ask a question, request code changes, or type / for commands...';
+      }
+    }
+
+    if (repoBadge && repoBadgeText) {
+      const savedRepo = localStorage.getItem('syntrak_connected_repo');
+      if (isRepoAuthorized) {
+        repoBadge.classList.add('connected');
+        repoBadgeText.textContent = savedRepo || 'Repo Connected';
+        repoBadge.title = `Connected to ${savedRepo || 'Repository'}. Click to manage.`;
+      } else {
+        repoBadge.classList.remove('connected');
+        repoBadgeText.textContent = 'Repo Locked';
+        repoBadge.title = 'No repository connected. Click to connect your GitHub repo.';
+      }
+    }
+  }
+
+  async function openRepoModal() {
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    try {
+      const res = await fetch('/api/repo/info', { headers: getAuthHeaders() });
+      if (res.ok) {
+        const info = await res.json();
+        const modalCurrentRepo = document.getElementById('modalCurrentRepo');
+        if (modalCurrentRepo) {
+          modalCurrentRepo.textContent = info.is_git_repo && info.repo_name ? `${info.repo_name} (${info.branch || 'main'})` : 'None (Chat Mode)';
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load repo info:', e);
+    }
+  }
+
+  function closeRepoModal() {
+    if (modal) modal.classList.add('hidden');
+  }
+
+  function setChatMode(mode, syncSidebar = true) {
+    currentChatMode = mode;
+    activeSidebarMode = mode;
+    localStorage.setItem('syntrak_chat_mode', mode);
+    updateModeUI();
+    if (syncSidebar && typeof switchSidebarMode === 'function') {
+      switchSidebarMode(mode, false);
+    } else {
+      renderConversationGroups(conversationsCache);
+      startNewConversation(mode);
+    }
+  }
+  window.setChatMode = setChatMode;
+
+  btnChat?.addEventListener('click', () => {
+    setChatMode('chat', true);
+    showToast('Switched to Chat Mode (ChatGPT-style conversational assistant)');
+  });
+
+  btnAgent?.addEventListener('click', () => {
+    if (!isRepoAuthorized) {
+      openRepoModal();
+    } else {
+      setChatMode('agent', true);
+      showToast('Switched to Agent Mode (Autonomous repo coding & tools enabled)');
+    }
+  });
+
+  repoBadge?.addEventListener('click', () => {
+    openRepoModal();
+  });
+
+  btnCloseModal?.addEventListener('click', closeRepoModal);
+  btnCancelAuth?.addEventListener('click', closeRepoModal);
+
+  btnConnectRepo?.addEventListener('click', async () => {
+    const repoUrl = document.getElementById('modalRepoUrl')?.value.trim();
+    const githubToken = document.getElementById('modalGithubToken')?.value.trim();
+    const branch = document.getElementById('modalBranch')?.value.trim() || 'main';
+
+    if (!repoUrl) {
+      showToast('Please enter your GitHub repository URL or owner/repo name.', 'error');
+      return;
+    }
+
+    btnConnectRepo.disabled = true;
+    btnConnectRepo.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Connecting...';
+
+    try {
+      const payload = { repo_url: repoUrl, github_token: githubToken || null, branch };
+
+      const res = await fetch('/api/repo/connect', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || `Server returned ${res.status}`);
+      }
+
+      const data = await res.json();
+      isRepoAuthorized = true;
+      localStorage.setItem('syntrak_repo_authorized', 'true');
+      localStorage.setItem('syntrak_connected_repo', data.repo_name);
+
+      startNewConversation('agent');
+      setChatMode('agent', true, false);
+
+      const headerWorkspace = document.getElementById('headerWorkspace');
+      if (headerWorkspace) headerWorkspace.textContent = `${data.repo_name} (${data.branch || 'main'})`;
+
+      closeRepoModal();
+      updateModeUI();
+      showToast(data.message || `Connected to ${data.repo_name}! Switched to Agent Mode.`);
+    } catch (err) {
+      showToast(`Connection failed: ${err.message}`, 'error');
+    } finally {
+      btnConnectRepo.disabled = false;
+      btnConnectRepo.innerHTML = '<i class="fa-solid fa-plug"></i> Connect & Enable Agent';
+    }
+  });
+
+  updateModeUI();
+}
+
+
+/* ==========================================================================
    Session & Git Controls
    ========================================================================== */
 async function loadSessionStatus() {
@@ -555,7 +796,18 @@ async function loadSessionStatus() {
 
     const shortModel = (data.model || 'Unknown').split('/').pop();
     document.getElementById('headerModelName').textContent = shortModel;
-    document.getElementById('headerWorkspace').textContent = data.workspace_root.split('/').pop() || 'main';
+
+    const headerWs = document.getElementById('headerWorkspace');
+    if (headerWs) {
+      if (data.has_connected_repo && data.connected_repo_name) {
+        headerWs.textContent = data.connected_repo_name;
+        headerWs.title = `Connected Workspace: ${data.workspace_root || data.connected_repo_name}`;
+      } else {
+        headerWs.textContent = 'No Repo';
+        headerWs.title = 'No repository connected. Click Agent mode to connect a repo.';
+      }
+    }
+
     document.getElementById('cfgModel').value = data.model || '';
     document.getElementById('cfgApiBase').value = data.api_base || '';
 
@@ -744,7 +996,9 @@ async function runQueryStream(query) {
       headers: getAuthHeaders(),
       body: JSON.stringify({
         query,
-        conversation_id: activeConversationId
+        conversation_id: activeConversationId,
+        mode: currentChatMode,
+        repo_authorized: isRepoAuthorized
       }),
       signal: activeAbortController.signal
     });
@@ -807,6 +1061,9 @@ function handleAgentEvent(event, contentEl, accumulatedMd, setMdCallback) {
   const messagesContainer = document.getElementById('chatMessages');
 
   if (event.event_type === 'token_stream') {
+    // Remove thinking indicator as soon as text tokens stream
+    const thinking = contentEl.querySelector('.thinking-indicator');
+    if (thinking) thinking.remove();
     const cursor = contentEl.querySelector('.cursor-typing');
     if (cursor) cursor.remove();
 
@@ -833,18 +1090,26 @@ function handleAgentEvent(event, contentEl, accumulatedMd, setMdCallback) {
     }
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
   } else if (event.event_type === 'agent_status') {
-    const statusSpan = contentEl.querySelector('.cursor-typing');
-    if (statusSpan && event.step > 1) {
-      statusSpan.textContent = `[step ${event.step}/25] executing...`;
+    let thinking = contentEl.querySelector('.thinking-indicator');
+    if (!thinking && !contentEl.querySelector('.markdown-rendered')) {
+      thinking = document.createElement('div');
+      thinking.className = 'thinking-indicator';
+      contentEl.appendChild(thinking);
+    }
+    if (thinking) {
+      thinking.innerHTML = `<i class="fa-solid fa-gear fa-spin"></i> <span>[step ${event.step || 1}/${event.max_steps || 25}] Executing reasoning & tools...</span>`;
     }
   } else if (event.event_type === 'tool_start') {
+    const thinking = contentEl.querySelector('.thinking-indicator');
+    if (thinking) thinking.remove();
+
     const card = document.createElement('div');
     card.className = 'tool-card';
     card.id = `tool-${event.tool_id}`;
     card.innerHTML = `
       <div class="tool-card-header">
         <span> tool: ${event.tool_name}</span>
-        <span>[RUNNING]</span>
+        <span><i class="fa-solid fa-spinner fa-spin"></i> [RUNNING]</span>
       </div>
       <div class="tool-card-body">${escapeHtml(JSON.stringify(event.arguments, null, 2))}</div>
     `;
@@ -858,9 +1123,13 @@ function handleAgentEvent(event, contentEl, accumulatedMd, setMdCallback) {
         <span> tool: ${event.tool_name}</span>
         <span>[${event.success ? 'OK' : 'ERR'}]</span>
       `;
-      card.querySelector('.tool-card-body').textContent = String(event.output || event.error);
+      card.querySelector('.tool-card-body').textContent = String(event.output || event.error || '(no output)');
     }
   } else if (event.event_type === 'error') {
+    const thinking = contentEl.querySelector('.thinking-indicator');
+    if (thinking) thinking.remove();
+    const cursor = contentEl.querySelector('.cursor-typing');
+    if (cursor) cursor.remove();
     appendSystemNote(contentEl, event.message, 'error');
   }
 }
@@ -894,7 +1163,12 @@ function createAssistantMessageElement() {
       <span style="color: var(--color-blue)">󰚩 syntrak[agent]</span>
       <span style="color: var(--text-dim)">&gt;</span>
     </div>
-    <div class="message-content"><span class="cursor-typing">⠋ thinking...</span></div>
+    <div class="message-content">
+      <div class="thinking-indicator">
+        <i class="fa-solid fa-circle-notch fa-spin"></i>
+        <span>thinking...</span>
+      </div>
+    </div>
   `;
   container.appendChild(msg);
   container.scrollTop = container.scrollHeight;

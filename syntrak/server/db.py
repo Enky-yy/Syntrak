@@ -19,6 +19,7 @@ from sqlalchemy import (
     event,
     func,
     select,
+    text,
 )
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -149,6 +150,7 @@ class ConversationModel(Base):
         index=True
     )
     title: Mapped[str] = mapped_column(String, nullable=False, default="New Chat")
+    chat_mode: Mapped[str] = mapped_column("chat_mode", String, nullable=False, default="chat", index=True)
     created_at: Mapped[str] = mapped_column(
         String,
         default=lambda: datetime.now(timezone.utc).isoformat()
@@ -171,15 +173,21 @@ class ConversationModel(Base):
         Index("idx_conversations_user", "user_id", "updated_at"),
     )
 
+    @property
+    def mode(self) -> str:
+        return getattr(self, "chat_mode", "chat") or "chat"
+
     def to_dict(self, message_count: int = 0) -> Dict[str, Any]:
         return {
             "id": self.id,
             "user_id": self.user_id,
             "title": self.title,
+            "mode": getattr(self, "chat_mode", "chat") or "chat",
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "message_count": message_count,
         }
+
 
 
 class MessageModel(Base):
@@ -274,8 +282,14 @@ class Database:
         )
 
     def init_db(self):
-        """Create database tables if they do not exist."""
+        """Create database tables if they do not exist, and migrate columns."""
         Base.metadata.create_all(bind=self.engine)
+        try:
+            with self.engine.connect() as conn:
+                conn.execute(text("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS chat_mode VARCHAR DEFAULT 'chat'"))
+                conn.commit()
+        except Exception:
+            pass
 
     @contextmanager
     def get_session(self) -> Generator[Session, None, None]:
@@ -330,8 +344,9 @@ class Database:
         user_id: str,
         title: Optional[str] = None,
         conversation_id: Optional[str] = None,
+        mode: str = "chat",
     ) -> Dict[str, Any]:
-        """Create a new conversation thread for user."""
+        """Create a new conversation thread for user with specified mode (chat or agent)."""
         # Ensure user exists (auto-create guest if needed)
         self.upsert_user(
             user_id=user_id,
@@ -340,7 +355,7 @@ class Database:
         )
 
         conv_id = conversation_id or str(uuid.uuid4())
-        conv_title = title or "New Chat"
+        conv_title = title or ("New Agent Session" if mode == "agent" else "New Chat")
         now = datetime.now(timezone.utc).isoformat()
 
         with self.get_session() as session:
@@ -348,6 +363,7 @@ class Database:
                 id=conv_id,
                 user_id=user_id,
                 title=conv_title,
+                chat_mode=mode,
                 created_at=now,
                 updated_at=now,
             )
@@ -355,19 +371,30 @@ class Database:
             session.flush()
             return conv.to_dict(message_count=0)
 
-    def get_conversations(self, user_id: str) -> List[Dict[str, Any]]:
-        """List all conversation threads with message counts for a user."""
+    def get_conversations(self, user_id: str, mode: Optional[str] = None) -> List[Dict[str, Any]]:
+        """List all conversation threads with message counts for a user, optionally filtered by mode."""
         with self.get_session() as session:
+            msg_count_sub = (
+                select(
+                    MessageModel.conversation_id,
+                    func.count(MessageModel.id).label("message_count"),
+                )
+                .group_by(MessageModel.conversation_id)
+                .subquery()
+            )
+
             stmt = (
                 select(
                     ConversationModel,
-                    func.count(MessageModel.id).label("message_count"),
+                    func.coalesce(msg_count_sub.c.message_count, 0).label("message_count"),
                 )
-                .outerjoin(MessageModel, ConversationModel.id == MessageModel.conversation_id)
+                .outerjoin(msg_count_sub, ConversationModel.id == msg_count_sub.c.conversation_id)
                 .where(ConversationModel.user_id == user_id)
-                .group_by(ConversationModel.id)
-                .order_by(ConversationModel.updated_at.desc())
             )
+            if mode:
+                stmt = stmt.where(ConversationModel.chat_mode == mode)
+            stmt = stmt.order_by(ConversationModel.updated_at.desc())
+
             results = []
             for conv, msg_count in session.execute(stmt):
                 results.append(conv.to_dict(message_count=msg_count))

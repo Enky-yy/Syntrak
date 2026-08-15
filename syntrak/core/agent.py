@@ -12,6 +12,7 @@ from syntrak.core.events import (
     ToolResultEvent,
     ToolStartEvent,
 )
+from syntrak.core.guardrails import validate_prompt_safety
 from syntrak.core.memory import MemoryManager
 from syntrak.llm.base import BaseLLMClient
 from syntrak.tools.base import ToolRegistry
@@ -35,9 +36,19 @@ class AgentRunner:
     async def run(
         self,
         user_query: str,
-        system_prompt: Optional[str] = None
+        system_prompt: Optional[str] = None,
+        enable_tools: bool = True
     ) -> AsyncGenerator[BaseEvent, None]:
         """Execute agent loop for a user query, yielding real-time stream events."""
+        # Validate safety and policy fundamentals
+        violation = validate_prompt_safety(user_query, mode="agent" if enable_tools else "chat")
+        if violation:
+            self.memory.add_message(role="user", content=user_query)
+            self.memory.add_message(role="assistant", content=violation)
+            yield TokenStreamEvent(token=violation)
+            yield DoneEvent(finish_reason="safety_policy_violation")
+            return
+
         # Ensure system prompt is at index 0 if provided
         if system_prompt:
             current_msgs = self.memory.get_messages()
@@ -57,7 +68,7 @@ class AgentRunner:
             yield AgentStatusEvent(status=f"Step {step}/{self.max_steps}", step=step, max_steps=self.max_steps)
 
             messages = self.memory.get_messages()
-            openai_tools = self.tools.to_openai_tools()
+            openai_tools = self.tools.to_openai_tools() if enable_tools else None
 
             accumulated_content = ""
             accumulated_thought = ""

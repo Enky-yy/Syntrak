@@ -33,3 +33,25 @@ async def test_session_status_and_model_switch():
         index_res = await client.get("/")
         assert index_res.status_code == 200
         assert "syntrak.nvim" in index_res.text
+        assert "btnModeChat" in index_res.text
+        assert "btnModeAgent" in index_res.text
+        assert "repoAuthModal" in index_res.text
+
+        # Test repo info endpoint
+        repo_res = await client.get("/api/repo/info")
+        assert repo_res.status_code == 200
+        repo_data = repo_res.json()
+        assert "repo_name" in repo_data
+        assert "workspace_root" in repo_data
+
+        # Test repo authorize endpoint
+        auth_res = await client.post("/api/repo/authorize", json={"grant": True, "github_token": "ghp_test123"})
+        assert auth_res.status_code == 200
+        assert auth_res.json()["granted"] is True
+
+        # Test repo connect validation (requires repo_url)
+        connect_err = await client.post("/api/repo/connect", json={"repo_url": ""})
+        assert connect_err.status_code in (400, 422)
+
+
+

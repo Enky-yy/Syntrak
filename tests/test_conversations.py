@@ -90,7 +90,23 @@ async def test_conversation_api_endpoints(temp_db):
         assert rename_res.status_code == 200
         assert rename_res.json()["title"] == "Updated Refactor"
 
-        # 6. Test delete conversation
+        # 6. Test mode-separated conversations
+        chat_conv = await client.post("/api/conversations", json={"title": "ChatGPT query", "mode": "chat"}, headers=headers)
+        agent_conv = await client.post("/api/conversations", json={"title": "Repo Task", "mode": "agent"}, headers=headers)
+        assert chat_conv.json()["mode"] == "chat"
+        assert agent_conv.json()["mode"] == "agent"
+
+        # Filter by mode=chat
+        chat_list = await client.get("/api/conversations?mode=chat", headers=headers)
+        assert any(c["id"] == chat_conv.json()["id"] for c in chat_list.json())
+        assert not any(c["id"] == agent_conv.json()["id"] for c in chat_list.json())
+
+        # Filter by mode=agent
+        agent_list = await client.get("/api/conversations?mode=agent", headers=headers)
+        assert any(c["id"] == agent_conv.json()["id"] for c in agent_list.json())
+        assert not any(c["id"] == chat_conv.json()["id"] for c in agent_list.json())
+
+        # 7. Test delete conversation
         del_res = await client.delete(f"/api/conversations/{conv_id}", headers=headers)
         assert del_res.status_code == 200
         assert del_res.json()["status"] == "success"
@@ -99,10 +115,11 @@ async def test_conversation_api_endpoints(temp_db):
         get_deleted = await client.get(f"/api/conversations/{conv_id}", headers=headers)
         assert get_deleted.status_code == 404
 
-        # 7. Test Logout endpoint
+        # 8. Test Logout endpoint
         logout_res = await client.post("/api/auth/logout")
         assert logout_res.status_code == 200
         assert logout_res.json()["status"] == "success"
+
 
 
 def test_sqlalchemy_session_and_models(temp_db):

@@ -1,5 +1,7 @@
 """Code review analysis tools for Syntrak."""
 
+import os
+from pathlib import Path
 import re
 from typing import Any, Dict, List, Optional
 from syntrak.tools.base import default_registry
@@ -14,7 +16,13 @@ def analyze_diff_for_review(staged: bool = False, target_branch: Optional[str] =
     """Analyze current repository diff and return structured metrics and changed file blocks."""
     raw_diff = git_diff(staged=staged, target_branch=target_branch)
     if raw_diff == "No diff detected.":
-        return "No changes found to review."
+        recent_diff = git_diff(target_branch="HEAD~1")
+        if recent_diff and recent_diff != "No diff detected.":
+            raw_diff = recent_diff
+        else:
+            ws = os.environ.get("SYNTRAK_WORKSPACE_ROOT")
+            repo_name = Path(ws).name if ws else "connected repository"
+            return f"Working tree clean in repository '{repo_name}'. No uncommitted or staged changes detected to review."
 
     file_diffs = re.split(r"^diff --git ", raw_diff, flags=re.MULTILINE)
     file_diffs = [d for d in file_diffs if d.strip()]

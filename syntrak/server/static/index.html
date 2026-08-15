@@ -36,13 +36,8 @@
           <span class="tab-icon">󰈚</span>
           <span class="tab-name">agent.buf</span>
         </button>
-        <button class="buffer-tab" data-tab="tabReview">
-          <span class="tab-index">2</span>
-          <span class="tab-icon">󰃢</span>
-          <span class="tab-name">review.diff</span>
-        </button>
         <button class="buffer-tab" data-tab="tabConfig">
-          <span class="tab-index">3</span>
+          <span class="tab-index">2</span>
           <span class="tab-icon"></span>
           <span class="tab-name">config.lua</span>
         </button>
@@ -76,13 +71,23 @@
       <!-- ChatGPT-Style Collapsible Sidebar -->
       <aside class="chat-sidebar" id="chatSidebar">
         <div class="sidebar-top">
+          <!-- Separate Storage Mode Tabs: Chats vs Agent Sessions -->
+          <div class="sidebar-mode-tabs">
+            <button class="sidebar-mode-tab active" id="sideTabChat" title="Chat History (Conversational)">
+              <i class="fa-solid fa-comment-dots"></i> <span>Chats</span>
+            </button>
+            <button class="sidebar-mode-tab" id="sideTabAgent" title="Agent Sessions (Coding & Repo)">
+              <i class="fa-solid fa-bolt"></i> <span>Agent Sessions</span>
+            </button>
+          </div>
+
           <button class="btn-new-chat" id="btnNewChat" title="Start a fresh conversation thread">
             <i class="fa-solid fa-plus"></i>
-            <span>New Chat</span>
+            <span id="btnNewChatLabel">New Chat</span>
           </button>
           <div class="sidebar-search">
             <i class="fa-solid fa-magnifying-glass"></i>
-            <input type="text" id="sidebarSearchInput" placeholder="Search chats..." />
+            <input type="text" id="sidebarSearchInput" placeholder="Search threads..." />
           </div>
         </div>
 
@@ -130,12 +135,25 @@
                 <i class="fa-solid fa-pencil"></i>
               </button>
             </div>
+            <!-- Mode Toggle Switcher -->
+            <div class="mode-toggle-container">
+              <button class="btn-mode active" id="btnModeChat" title="Chat Mode: Direct conversational assistant (ChatGPT style) without repo access">
+                <i class="fa-solid fa-comment-dots"></i> Chat
+              </button>
+              <button class="btn-mode" id="btnModeAgent" title="Agent Mode: Autonomous coding agent with repository tools">
+                <i class="fa-solid fa-bolt"></i> Agent
+              </button>
+              <button class="repo-badge-status" id="repoBadgeStatus" title="Click to manage repository access">
+                <i class="fa-brands fa-github"></i> <span id="repoBadgeText">Repo Locked</span>
+              </button>
+            </div>
             <div class="thread-actions">
               <button class="btn-thread-action" id="btnDeleteActiveThread" title="Delete current conversation">
                 <i class="fa-regular fa-trash-can"></i>
               </button>
             </div>
           </div>
+
 
           <div class="terminal-feed" id="chatMessages">
             <!-- Neovim Welcome Splash -->
@@ -201,7 +219,7 @@
               <span class="cmdline-prompt">❯</span>
               <textarea
                 id="promptInput"
-                placeholder="Ask a question, request code changes, or type '/' for commands..."
+                placeholder="Ask anything in Chat mode, or switch to Agent mode for repo coding..."
                 rows="1"
               ></textarea>
               <div class="cmdline-actions">
@@ -219,23 +237,7 @@
           </div>
         </section>
 
-        <!-- Review Buffer (Tab 2) -->
-        <section class="window-pane" id="tabReview">
-          <div class="pane-header">
-            <span>󰃢 review.diff [Code Review Buffer]</span>
-            <button class="btn-nvim-sm" onclick="sendQuickPrompt('/review')">
-              <i class="fa-solid fa-play"></i> :RunReview
-            </button>
-          </div>
-          <div class="pane-body" id="reviewOutput">
-            <div class="empty-buffer">
-              <p>-- No active review generated --</p>
-              <p>Click <code>:RunReview</code> or run <code>/review</code> in the command line.</p>
-            </div>
-          </div>
-        </section>
-
-        <!-- Config Buffer (Tab 3) -->
+        <!-- Config Buffer (Tab 2) -->
         <section class="window-pane" id="tabConfig">
           <div class="pane-header">
             <span> config.lua [LLM & Provider Configuration]</span>
@@ -266,11 +268,11 @@
     <!-- Bottom Tmux / Powerline Statusline -->
     <footer class="statusline">
       <div class="status-left">
-        <span class="stl-mode" id="stlMode">NORMAL</span>
-        <span class="stl-arrow-1"></span>
+        <span class="stl-mode" id="stlMode">CHAT</span>
+        <span class="stl-arrow-1" id="stlArrow1"></span>
         <span class="stl-git"><i class="fa-solid fa-code-branch"></i> <span id="headerWorkspace">main</span></span>
         <span class="stl-arrow-2"></span>
-        <span class="stl-file" id="stlActiveBuffer">agent.buf</span>
+        <span class="stl-file" id="stlActiveBuffer">chat.buf</span>
         <span class="stl-arrow-3"></span>
       </div>
 
@@ -283,6 +285,54 @@
         <span class="stl-host">syntrak.nvim</span>
       </div>
     </footer>
+  </div>
+
+  <!-- Repository Access & GitHub Setup Modal -->
+  <div class="modal-overlay hidden" id="repoAuthModal">
+    <div class="nvim-modal">
+      <div class="modal-header">
+        <span><i class="fa-brands fa-github"></i> Connect Your GitHub Repository</span>
+        <button class="btn-modal-close" id="btnCloseRepoModal"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">
+          To run in <strong>Agent Mode</strong>, connect your GitHub repository so the AI agent can inspect, review, test, and edit code on your project.
+        </p>
+
+        <!-- GitHub Repo Section -->
+        <div id="sectionGithub">
+          <div class="nvim-form-group">
+            <label>GitHub Repository (owner/repo or URL) <span style="color: var(--color-red);">*</span></label>
+            <input type="text" id="modalRepoUrl" placeholder="e.g. username/my-app or https://github.com/user/project">
+          </div>
+
+          <div class="nvim-form-group">
+            <label>GitHub Personal Access Token (PAT) <span style="color: var(--text-dim); font-size: 11px;">(Recommended for private repos)</span></label>
+            <input type="password" id="modalGithubToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+            <small style="color: var(--text-dim); font-size: 10px; display: block; margin-top: 3px;">Create token on GitHub with <code>repo</code> permissions to clone and edit private code.</small>
+          </div>
+
+          <div class="nvim-form-group">
+            <label>Branch</label>
+            <input type="text" id="modalBranch" value="main" placeholder="main">
+          </div>
+        </div>
+
+        <!-- Current Workspace Status -->
+        <div class="repo-info-card">
+          <div class="repo-info-row">
+            <span class="info-label">Active Workspace:</span>
+            <span class="info-val font-mono text-cyan" id="modalCurrentRepo">None (Chat Mode)</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" id="btnCancelRepoAuth">Cancel (Stay in Chat)</button>
+        <button class="btn-modal-grant" id="btnConnectRepo">
+          <i class="fa-solid fa-plug"></i> Connect & Enable Agent
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Toast Notification Stack -->
