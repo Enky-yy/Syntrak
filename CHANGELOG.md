@@ -4,6 +4,16 @@ All notable changes to the **Syntrak** project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-08-15
+
+### Added
+- **Developer Guidelines & Changelog**: Added `AGENTS.md` and `CHANGELOG.md` to the project root.
+- **Resilient Database Driver Handling**: Added automatic SQLite fallback if `psycopg2` or remote database connection is unavailable.
+- **Package Dependency**: Added `psycopg2-binary>=2.9.0` to core dependencies for seamless PostgreSQL support.
+
+### Changed
+- Refined Web UI statusline elements and footer host indicator in `syntrak.nvim`.
+
 ---
 
 ## [0.1.2] - 2026-08-15
