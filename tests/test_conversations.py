@@ -105,3 +105,45 @@ async def test_conversation_api_endpoints(temp_db):
         assert logout_res.json()["status"] == "success"
 
 
+def test_sqlalchemy_session_and_models(temp_db):
+    from syntrak.server.db import ConversationModel, MessageModel, UserModel
+
+    # Test direct session manipulation
+    with temp_db.get_session() as session:
+        user = UserModel(id="orm-user", email="orm@example.com", name="ORM User")
+        session.add(user)
+        session.flush()
+
+        conv = ConversationModel(id="orm-conv", user_id=user.id, title="ORM Conversation")
+        session.add(conv)
+        session.flush()
+
+        msg = MessageModel(id="orm-msg", conversation_id=conv.id, role="user", content="Direct ORM query test")
+        session.add(msg)
+
+    # Verify querying through session
+    with temp_db.get_session() as session:
+        fetched_user = session.get(UserModel, "orm-user")
+        assert fetched_user is not None
+        assert fetched_user.name == "ORM User"
+        assert len(fetched_user.conversations) == 1
+        assert fetched_user.conversations[0].id == "orm-conv"
+        assert len(fetched_user.conversations[0].messages) == 1
+        assert fetched_user.conversations[0].messages[0].content == "Direct ORM query test"
+
+
+def test_get_db_url_normalization(tmp_path):
+    from syntrak.server.db import get_db_url
+
+    # Test postgres URL normalization
+    norm = get_db_url(db_url="postgres://user:pass@localhost:5432/mydb")
+    assert norm == "postgresql://user:pass@localhost:5432/mydb"
+
+    # Test sqlite path resolution
+    test_path = tmp_path / "sqlite_test.db"
+    sqlite_url = get_db_url(db_path=test_path)
+    assert sqlite_url.startswith("sqlite:///")
+    assert str(test_path.resolve()) in sqlite_url
+
+
+

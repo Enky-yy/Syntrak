@@ -43,7 +43,7 @@ htmlcov/
 .syntrakrc.yaml
 .campusclirc.yaml
 history
-1.txt
+pypi_token.txt
 *.token
 .env
 *.env

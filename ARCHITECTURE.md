@@ -27,7 +27,7 @@ flowchart TD
     end
 
     subgraph Persistence_Layer["3. Persistence & Secret Layer"]
-        SQLiteDB["SQLite DB Engine (syntrak.server.db)\n(users, conversations, messages, events)"]
+        SQLAlchemyDB["SQLAlchemy ORM Engine (syntrak.server.db)\n(SQLite / PostgreSQL / MySQL)\n(users, conversations, messages, events)"]
         EnvLoader["Zero-Leak Secret Loader (syntrak.config)\n(.env / .syntrak/.env / system vars)"]
     end
 
@@ -62,13 +62,13 @@ flowchart TD
     
     FastAPI --> AuthService
     FastAPI --> SSE & REST
-    FastAPI --> SQLiteDB
+    FastAPI --> SQLAlchemyDB
     
     SSE & REST --> Session
     Session --> Agent
     Session --> Memory
     Session --> Context
-    Session --> SQLiteDB
+    Session --> SQLAlchemyDB
 
     Agent --> LLM_Gateway
     Agent --> Tool_Engine
@@ -80,7 +80,7 @@ flowchart TD
     Tool_Engine --> Events
     Events --> REPL
     Events --> SSE
-    SSE --> SQLiteDB
+    SSE --> SQLAlchemyDB
 ```
 
 ---
@@ -103,10 +103,10 @@ flowchart TD
   - `create_jwt_token` & `decode_jwt_token`: Generates and verifies HMAC-SHA256 JWT tokens.
   - `get_current_user`: FastAPI dependency supporting Authorization headers, HTTP-only cookies, and guest local fallback.
 - **`syntrak.server.db.Database`**:
-  - SQLite backend (`~/.syntrak/syntrak.db`) managing relational tables with foreign keys:
-    - `users`: Google user profiles (`id`, `email`, `name`, `picture`, `created_at`).
-    - `conversations`: Thread records (`id`, `user_id`, `title`, timestamps).
-    - `messages`: Multi-turn turns storing role (`user` / `assistant`), text markdown, and serialized tool/thought event streams.
+  - SQLAlchemy 2.0 ORM backend supporting SQLite, PostgreSQL (via psycopg2), and MySQL with connection pooling and session management:
+    - `UserModel` (`users`): User profiles (`id`, `email`, `name`, `picture`, `created_at`).
+    - `ConversationModel` (`conversations`): Thread records (`id`, `user_id`, `title`, timestamps) with cascade relations.
+    - `MessageModel` (`messages`): Multi-turn turns storing role (`user` / `assistant`), text markdown, and serialized tool/thought event streams.
 
 ---
 
