@@ -111,6 +111,18 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
         response.headers["X-XSS-Protection"] = "1; mode=block"
         return response
 
+    # Maximum Request Body Size Middleware (5 MB limit)
+    @app.middleware("http")
+    async def limit_request_size(request: Request, call_next):
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                if int(content_length) > 5 * 1024 * 1024:
+                    return Response(content="Request payload too large (max 5 MB)", status_code=413)
+            except ValueError:
+                pass
+        return await call_next(request)
+
     allowed_origins_env = os.getenv("SYNTRAK_ALLOWED_ORIGINS", "")
     if allowed_origins_env:
         allowed_origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
@@ -391,19 +403,19 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
 
         if target_repo_dir.exists() and (target_repo_dir / ".git").exists():
             try:
-                subprocess.run(["git", "fetch"], cwd=str(target_repo_dir), capture_output=True, text=True, check=False, env=git_env)
-                subprocess.run(["git", "checkout", branch], cwd=str(target_repo_dir), capture_output=True, text=True, check=False, env=git_env)
+                subprocess.run(["git", "-c", "core.hooksPath=/dev/null", "fetch"], cwd=str(target_repo_dir), capture_output=True, text=True, check=False, env=git_env)
+                subprocess.run(["git", "-c", "core.hooksPath=/dev/null", "checkout", branch], cwd=str(target_repo_dir), capture_output=True, text=True, check=False, env=git_env)
             except Exception:
                 pass
         else:
             target_repo_dir.mkdir(parents=True, exist_ok=True)
-            clone_cmd = ["git", "clone", "--depth", "50"]
+            clone_cmd = ["git", "-c", "core.hooksPath=/dev/null", "clone", "--depth", "50"]
             if branch:
                 clone_cmd.extend(["-b", branch])
             clone_cmd.extend([clone_url, str(target_repo_dir)])
             res = subprocess.run(clone_cmd, capture_output=True, text=True, check=False, env=git_env)
             if res.returncode != 0:
-                res_fallback = subprocess.run(["git", "clone", "--depth", "50", clone_url, str(target_repo_dir)], capture_output=True, text=True, check=False, env=git_env)
+                res_fallback = subprocess.run(["git", "-c", "core.hooksPath=/dev/null", "clone", "--depth", "50", clone_url, str(target_repo_dir)], capture_output=True, text=True, check=False, env=git_env)
                 if res_fallback.returncode != 0:
                     err_msg = res.stderr.strip() or res_fallback.stderr.strip()
                     if token:
@@ -411,7 +423,7 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
                     raise HTTPException(status_code=400, detail=f"Failed to clone GitHub repository: {err_msg}")
 
         # Sanitize remote origin URL so tokens are never persisted in .git/config
-        subprocess.run(["git", "remote", "set-url", "origin", cleaned_url], cwd=str(target_repo_dir), capture_output=True, text=True, check=False, env=git_env)
+        subprocess.run(["git", "-c", "core.hooksPath=/dev/null", "remote", "set-url", "origin", cleaned_url], cwd=str(target_repo_dir), capture_output=True, text=True, check=False, env=git_env)
 
         session.set_workspace(str(target_repo_dir))
         session.has_connected_repo = True

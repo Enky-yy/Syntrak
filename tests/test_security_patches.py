@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from syntrak.config import SyntrakConfig
 from syntrak.server.app import create_app
 from syntrak.server.auth import create_jwt_token, verify_google_credential
@@ -194,3 +195,51 @@ async def test_security_headers_and_ssrf_protection(temp_db):
         )
         assert res_ssrf2.status_code == 400
         assert "SSRF protection policy" in res_ssrf2.json()["detail"]
+
+        # Request body size limit test (413 Payload Too Large)
+        res_large = await client.post(
+            "/api/model",
+            content="x" * (6 * 1024 * 1024),
+            headers={"Content-Type": "application/json", "Content-Length": str(6 * 1024 * 1024)}
+        )
+        assert res_large.status_code == 413
+
+
+def test_secret_scrubber_redacts_credentials():
+    """Verify secret scrubber masks API keys, PATs, and JWTs."""
+    from syntrak.core.agent import scrub_secrets
+    raw_leak = "My key is sk-1234567890abcdef1234567890 and ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ123456"
+    cleaned = scrub_secrets(raw_leak)
+    assert "sk-1234567890" not in cleaned
+    assert "ghp_ABC" not in cleaned
+    assert "[REDACTED_SECRET]" in cleaned
+
+
+def test_read_file_untrusted_delimiters_and_size_limit(tmp_path, monkeypatch):
+    """Verify read_file encapsulates content in untrusted tags and rejects oversized files."""
+    monkeypatch.setenv("SYNTRAK_WORKSPACE_ROOT", str(tmp_path))
+
+    # Untrusted delimiter test
+    safe_file = tmp_path / "app.py"
+    safe_file.write_text("print('test')")
+    res_read = read_file("app.py")
+    assert "<untrusted_file_content path='app.py'>" in res_read
+    assert "</untrusted_file_content>" in res_read
+
+    # Oversized file test
+    large_file = tmp_path / "huge.log"
+    # Create file > 5MB
+    large_file.write_bytes(b"A" * (6 * 1024 * 1024))
+    res_large = read_file("huge.log")
+    assert "exceeds maximum allowable size limit" in res_large
+
+
+def test_sqlite_wal_mode_and_pragmas(tmp_path):
+    """Verify SQLite database enables WAL journal mode and foreign keys."""
+    db_file = tmp_path / "pragma_test.db"
+    db = Database(db_path=db_file)
+    with db.get_session() as s:
+        journal_mode = s.execute(text("PRAGMA journal_mode")).scalar()
+        foreign_keys = s.execute(text("PRAGMA foreign_keys")).scalar()
+        assert str(journal_mode).lower() == "wal"
+        assert int(foreign_keys) == 1

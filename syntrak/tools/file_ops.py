@@ -56,6 +56,9 @@ def _resolve_path(path_str: str) -> Path:
     return resolved
 
 
+MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB limit for automated reads/searches
+
+
 @default_registry.register(
     name="read_file",
     description="Read content of a file with optional line ranges."
@@ -70,6 +73,8 @@ def read_file(file_path: str, start_line: Optional[int] = None, end_line: Option
     if not path.is_file():
         return f"Error: File '{file_path}' does not exist."
 
+    if path.stat().st_size > MAX_FILE_SIZE_BYTES:
+        return f"Error: File '{file_path}' exceeds maximum allowable size limit of 5 MB."
 
     try:
         with open(path, "r", encoding="utf-8", errors="replace") as f:
@@ -91,7 +96,8 @@ def read_file(file_path: str, start_line: Optional[int] = None, end_line: Option
             result_lines.append(f"{i:4d} | {line_str}")
 
         header = f"--- {file_path} (Lines {s_line}-{e_line} of {total_lines}) ---\n"
-        return header + "\n".join(result_lines)
+        body = "\n".join(result_lines)
+        return f"<untrusted_file_content path='{file_path}'>\n{header}{body}\n</untrusted_file_content>"
     except Exception as e:
         return f"Error reading file '{file_path}': {str(e)}"
 
@@ -272,6 +278,8 @@ def search_files(query: str, dir_path: str = ".", file_pattern: Optional[str] = 
             rel_file_path = os.path.relpath(full_file_path, path)
 
             try:
+                if os.path.getsize(full_file_path) > MAX_FILE_SIZE_BYTES:
+                    continue
                 with open(full_file_path, "r", encoding="utf-8", errors="ignore") as f:
                     for line_num, line in enumerate(f, 1):
                         if regex.search(line):

@@ -91,12 +91,14 @@ def get_db_url(
     return url
 
 
-# Enable SQLite foreign key cascade support
+# Enable SQLite foreign key cascade support, WAL mode, and concurrency busy timeout
 @event.listens_for(Engine, "connect")
 def _set_sqlite_pragma(dbapi_connection, connection_record):
     if isinstance(dbapi_connection, sqlite3.Connection):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
         cursor.close()
 
 

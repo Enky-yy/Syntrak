@@ -11,7 +11,7 @@ def _run_git(args: List[str], cwd: Optional[str] = None) -> str:
     work_dir = cwd or os.environ.get("SYNTRAK_WORKSPACE_ROOT") or os.getcwd()
     try:
         res = subprocess.run(
-            ["git"] + args,
+            ["git", "-c", "core.hooksPath=/dev/null"] + args,
             cwd=work_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

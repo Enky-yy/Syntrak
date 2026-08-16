@@ -1,6 +1,7 @@
 """ReAct Agent Loop with streaming event architecture for Syntrak."""
 
 import json
+import re
 from typing import Any, AsyncGenerator, Dict, List, Optional
 from syntrak.core.events import (
     AgentStatusEvent,
@@ -16,6 +17,23 @@ from syntrak.core.guardrails import validate_prompt_safety
 from syntrak.core.memory import MemoryManager
 from syntrak.llm.base import BaseLLMClient
 from syntrak.tools.base import ToolRegistry
+
+SECRET_PATTERNS = [
+    re.compile(r"sk-[a-zA-Z0-9_\-]{20,}"),
+    re.compile(r"ghp_[a-zA-Z0-9_\-]{20,}"),
+    re.compile(r"github_pat_[a-zA-Z0-9_\-]{20,}"),
+    re.compile(r"eyJ[a-zA-Z0-9_\-]{10,}\.eyJ[a-zA-Z0-9_\-]{10,}\.[a-zA-Z0-9_\-]+"),
+]
+
+
+def scrub_secrets(text: str) -> str:
+    """Scrub sensitive credential patterns from streaming tokens and tool outputs."""
+    if not text:
+        return text
+    result = text
+    for pat in SECRET_PATTERNS:
+        result = pat.sub("[REDACTED_SECRET]", result)
+    return result
 
 
 class AgentRunner:
@@ -81,8 +99,9 @@ class AgentRunner:
                         yield ThoughtStreamEvent(thought=chunk.delta_thought)
 
                     if chunk.delta_text:
+                        sanitized_token = scrub_secrets(chunk.delta_text)
                         accumulated_content += chunk.delta_text
-                        yield TokenStreamEvent(token=chunk.delta_text)
+                        yield TokenStreamEvent(token=sanitized_token)
 
                     if chunk.is_done:
                         pending_tool_calls = chunk.tool_calls
@@ -139,18 +158,25 @@ class AgentRunner:
                     success = False
                     error_msg = str(ex)
 
+                scrubbed_output = scrub_secrets(str(tool_output))
+
                 yield ToolResultEvent(
                     tool_name=tool_name,
                     tool_id=call_id,
                     success=success,
-                    output=tool_output,
+                    output=scrubbed_output,
                     error=error_msg
                 )
 
-                # Add tool result message to conversation memory
+                # Add tool result message to conversation memory with untrusted delimiter encapsulation
+                encapsulated_output = (
+                    f"<untrusted_tool_output tool='{tool_name}'>\n"
+                    f"{scrubbed_output}\n"
+                    f"</untrusted_tool_output>"
+                )
                 self.memory.add_message(
                     role="tool",
-                    content=str(tool_output),
+                    content=encapsulated_output,
                     tool_call_id=call_id,
                     name=tool_name
                 )

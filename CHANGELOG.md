@@ -22,6 +22,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Excluded sensitive secret files from `search_files` and `list_directory` to prevent accidental credential indexing.
   - Enforced strict default workspace boundary containment on relative paths even when `SYNTRAK_WORKSPACE_ROOT` is unset.
   - Implemented in-memory sliding window rate limiter for expensive endpoints (`/api/chat/stream`, `/api/repo/connect`).
+  - Added indirect prompt injection defenses wrapping external files and tool outputs in `<untrusted_file_content>` and `<untrusted_tool_output>` tags.
+  - Added stream regex scrubber (`scrub_secrets`) masking API keys (`sk-...`, `ghp-...`, JWTs) from live token streams.
+  - Disabled untrusted Git hooks execution during repository clone and workspace operations (`-c core.hooksPath=/dev/null`).
+  - Enabled SQLite Write-Ahead Logging (`PRAGMA journal_mode=WAL;`) and concurrency busy timeout (`5000ms`) to eliminate database write lock contention.
+  - Added HTTP request body payload size limiting middleware (rejecting payloads > 5 MB with HTTP 413).
+  - Enforced 5 MB maximum file read and search inspection limit to prevent Out-Of-Memory (OOM) Denial of Service.
 
 ### Changed
 - Bumped project version to `0.2.0` across packaging, server metadata, and UI headers.
