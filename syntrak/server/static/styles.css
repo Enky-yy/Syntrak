@@ -1842,4 +1842,447 @@ textarea#promptInput {
   font-weight: bold;
 }
 
+/* ==========================================================================
+   Responsive Design & Device Support (Mobile, Tablet, Desktop)
+   ========================================================================== */
+
+/* Mobile Sidebar Backdrop */
+.sidebar-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 90;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-backdrop.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Base Responsive Fixes */
+pre, code {
+  max-width: 100%;
+}
+
+.terminal-feed pre {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* --------------------------------------------------------------------------
+   Tablets & Medium Screens (max-width: 1024px)
+   -------------------------------------------------------------------------- */
+@media screen and (max-width: 1024px) {
+  .chat-sidebar {
+    width: 240px;
+  }
+
+  .bufferline-right .nvim-version {
+    display: none;
+  }
+
+  .statusline .stl-encoding,
+  .statusline .stl-arrow-r2 {
+    display: none;
+  }
+
+  .quick-commands-grid {
+    grid-template-columns: repeat(2, 1fr);
+    max-width: 90%;
+  }
+
+  .nvim-splash .ascii-banner {
+    font-size: min(1.6vw, 11px);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Mobile Devices & Small Tablets (max-width: 768px)
+   -------------------------------------------------------------------------- */
+@media screen and (max-width: 768px) {
+  body {
+    font-size: 13px;
+  }
+
+  .workspace-wrapper {
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Slide-over Drawer for Sidebar on Mobile */
+  .chat-sidebar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 85vw;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.26s ease;
+    box-shadow: none;
+  }
+
+  .chat-sidebar.mobile-open {
+    transform: translateX(0);
+    box-shadow: 4px 0 28px rgba(0, 0, 0, 0.75);
+  }
+
+  .chat-sidebar.collapsed {
+    transform: translateX(-100%);
+    width: 280px;
+    opacity: 1;
+    pointer-events: none;
+  }
+
+  /* Bufferline on Mobile */
+  .bufferline {
+    height: 38px;
+    padding: 0 4px;
+  }
+
+  .buffer-tab-toggle {
+    width: 38px;
+  }
+
+  .buffer-tab {
+    padding: 0 10px;
+    font-size: 11.5px;
+    gap: 4px;
+  }
+
+  .bufferline-right {
+    gap: 6px;
+    padding-right: 4px;
+  }
+
+  .theme-selector-box label {
+    display: none;
+  }
+
+  .theme-selector-box {
+    padding: 2px 4px;
+  }
+
+  select#themeSelect {
+    font-size: 11px;
+    max-width: 76px;
+  }
+
+  .btn-nvim-action {
+    padding: 3px 6px;
+    font-size: 10.5px;
+  }
+
+  .nvim-version {
+    display: none;
+  }
+
+  /* Chat Thread Header Bar on Mobile */
+  .chat-thread-bar {
+    flex-direction: column;
+    align-items: stretch;
+    height: auto;
+    min-height: 44px;
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .thread-info {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .thread-title {
+    max-width: calc(100vw - 110px);
+  }
+
+  .mode-toggle-container {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .btn-mode {
+    flex: 1;
+    justify-content: center;
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+
+  .repo-badge-status {
+    flex: 1.2;
+    justify-content: center;
+    padding: 5px 8px;
+    font-size: 10.5px;
+    text-align: center;
+  }
+
+  /* Neovim Welcome Splash */
+  .nvim-splash {
+    padding: 16px 8px;
+    gap: 14px;
+  }
+
+  .nvim-splash .ascii-banner {
+    font-size: min(2.1vw, 8.5px);
+    line-height: 1.15;
+    letter-spacing: -0.5px;
+    overflow-x: auto;
+    max-width: 100%;
+    margin: 0 auto;
+  }
+
+  .splash-meta {
+    font-size: 11px;
+    padding: 0 4px;
+  }
+
+  .quick-commands-grid {
+    grid-template-columns: 1fr;
+    width: 100%;
+    max-width: 100%;
+    gap: 6px;
+    padding: 0 4px;
+  }
+
+  .cmd-chip {
+    padding: 8px 10px;
+  }
+
+  .cmd-chip .cmd-desc {
+    font-size: 10.5px;
+  }
+
+  /* Terminal Feed / Messages */
+  .terminal-feed {
+    padding: 10px 8px 16px 8px;
+  }
+
+  .msg-row {
+    padding: 10px 6px;
+    gap: 8px;
+  }
+
+  .msg-avatar {
+    width: 24px;
+    height: 24px;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+
+  .msg-bubble {
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+
+  .msg-bubble table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tool-call-block, .tool-result-block {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+
+  /* Command Line Box on Mobile */
+  .cmdline-container {
+    padding: 8px;
+  }
+
+  .cmdline-form {
+    padding: 4px 6px;
+    min-height: 42px;
+  }
+
+  .cmdline-prompt {
+    font-size: 13px;
+    padding-left: 2px;
+  }
+
+  #promptInput {
+    font-size: 13px;
+    line-height: 1.4;
+    padding: 4px 6px;
+  }
+
+  .cmdline-actions {
+    gap: 4px;
+  }
+
+  .btn-cmd {
+    width: 32px;
+    height: 32px;
+    font-size: 13px;
+  }
+
+  .slash-popup {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-width: calc(100vw - 16px);
+    margin-bottom: 6px;
+  }
+
+  /* Statusline on Mobile */
+  .statusline {
+    height: 22px;
+    font-size: 10.5px;
+  }
+
+  .statusline .stl-arrow-2,
+  .statusline .stl-arrow-3,
+  .statusline .stl-arrow-r1,
+  .statusline .stl-arrow-r2,
+  .statusline .stl-arrow-r3,
+  .statusline .stl-encoding,
+  .statusline .stl-host,
+  .statusline .stl-file {
+    display: none !important;
+  }
+
+  .statusline .stl-mode {
+    padding: 0 8px;
+    font-size: 10px;
+  }
+
+  .statusline .stl-git {
+    padding: 0 6px;
+    font-size: 10px;
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .statusline .stl-model {
+    padding: 0 6px;
+    font-size: 10px;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Modal Responsiveness */
+  .modal-overlay {
+    padding: 12px;
+    align-items: center;
+  }
+
+  .nvim-modal {
+    width: 100%;
+    max-width: 480px;
+    max-height: 88vh;
+    border-radius: 6px;
+  }
+
+  .modal-body {
+    padding: 14px;
+    max-height: calc(88vh - 120px);
+    overflow-y: auto;
+  }
+
+  .modal-footer {
+    flex-direction: column-reverse;
+    gap: 8px;
+    padding: 10px 14px;
+  }
+
+  .btn-modal-cancel,
+  .btn-modal-grant {
+    width: 100%;
+    justify-content: center;
+    padding: 9px;
+  }
+
+  /* Config Lua Pane */
+  .pane-body {
+    padding: 14px;
+  }
+
+  .nvim-form {
+    max-width: 100%;
+  }
+
+  .nvim-form-group input {
+    font-size: 12.5px;
+    padding: 8px 10px;
+  }
+
+  .btn-nvim-save {
+    width: 100%;
+    justify-content: center;
+    padding: 10px;
+  }
+
+  /* Toast Notifications on Mobile */
+  .toast-stack {
+    left: 12px;
+    right: 12px;
+    bottom: 30px;
+    max-width: calc(100vw - 24px);
+  }
+
+  .toast {
+    font-size: 11.5px;
+    padding: 8px 12px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Small Mobile Phones (max-width: 480px)
+   -------------------------------------------------------------------------- */
+@media screen and (max-width: 480px) {
+  .buffer-tab .tab-name {
+    display: none;
+  }
+
+  .buffer-tab {
+    padding: 0 8px;
+  }
+
+  .btn-nvim-action span {
+    display: none;
+  }
+
+  .btn-nvim-action {
+    padding: 4px 7px;
+  }
+
+  .nvim-splash .ascii-banner {
+    font-size: min(2.5vw, 7px);
+  }
+
+  .quick-commands-grid .cmd-chip {
+    padding: 6px 8px;
+  }
+
+  .thread-title {
+    max-width: calc(100vw - 140px);
+    font-size: 12px;
+  }
+
+  .statusline .stl-model {
+    max-width: 100px;
+  }
+
+  .statusline .stl-git {
+    max-width: 80px;
+  }
+}
+
 

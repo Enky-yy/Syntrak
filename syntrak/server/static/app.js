@@ -162,6 +162,8 @@ function initSidebar() {
   sideTabAgent?.addEventListener('click', () => {
     switchSidebarMode('agent', true);
   });
+
+  document.getElementById('sidebarBackdrop')?.addEventListener('click', closeMobileSidebar);
 }
 
 function shiftToMostRecentConversation(mode) {
@@ -202,8 +204,26 @@ function switchSidebarMode(mode, syncMain = true) {
 
 function toggleSidebar() {
   const sidebar = document.getElementById('chatSidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
   if (sidebar) {
-    sidebar.classList.toggle('collapsed');
+    if (window.innerWidth <= 768) {
+      const isMobileOpen = sidebar.classList.toggle('mobile-open');
+      sidebar.classList.remove('collapsed');
+      if (backdrop) backdrop.classList.toggle('active', isMobileOpen);
+    } else {
+      sidebar.classList.remove('mobile-open');
+      if (backdrop) backdrop.classList.remove('active');
+      sidebar.classList.toggle('collapsed');
+    }
+  }
+}
+
+function closeMobileSidebar() {
+  if (window.innerWidth <= 768) {
+    const sidebar = document.getElementById('chatSidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    if (sidebar) sidebar.classList.remove('mobile-open');
+    if (backdrop) backdrop.classList.remove('active');
   }
 }
 
@@ -326,6 +346,7 @@ function filterConversations(query) {
 
 async function selectConversation(convId, syncMode = true) {
   activeConversationId = convId;
+  closeMobileSidebar();
   switchTab('tabChat');
 
   const selectedConv = (conversationsCache || []).find(c => c.id === convId);
@@ -398,6 +419,7 @@ function renderConversationMessages(messages) {
 function startNewConversation(mode) {
   const targetMode = mode || currentChatMode || 'chat';
   activeConversationId = null;
+  closeMobileSidebar();
   const titleEl = document.getElementById('activeThreadTitle');
   if (titleEl) {
     titleEl.textContent = targetMode === 'agent' ? 'New Session' : 'New Chat';

@@ -101,6 +101,7 @@ flowchart TD
 - **Terminal REPL (`syntrak.ui.repl`)**: Interactive command-line environment built on `prompt_toolkit` and `rich`. Features auto-completion, multiline editing, ANSI styling, and command dispatching (`/help`, `/review`, `/diff`, `/undo`, `/model`, `/clear`).
 - **Rich Renderer (`syntrak.ui.renderer`)**: Formats agent thoughts, collapsible diff blocks, and streaming code blocks in real-time.
 - **Web Console (`syntrak.server.static`)**: Monospace Neovim-styled (`syntrak.nvim`) developer dashboard with:
+  - **Multi-Device & Responsive Layout**: Full media query design system supporting desktops, tablets (`<=1024px`), mobile devices (`<=768px`), and small phone viewports (`<=480px`), featuring slide-over touch drawer navigation, backdrop blur, adaptive statuslines, and touch-optimized command inputs.
   - **Dual Mode Toggles**: Instant switching between neutral conversational **Chat Mode** and repository-enabled **Agent Mode**.
   - **ChatGPT-Style Sidebar**: Filtered by active mode, real-time search, date grouping (*Today*, *Yesterday*, *Previous 7 Days*, *Older*), inline title editing, and deletion.
   - **Google Identity Services Integration**: One-click Google Sign-In with dynamic button rendering and user profile card.

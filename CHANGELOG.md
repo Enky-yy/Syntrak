@@ -1,10 +1,37 @@
-# 📜 Changelog
+  # 📜 Changelog
 
 All notable changes to the **Syntrak** project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.3] - 2026-08-15
+## [0.2.0] - 2026-08-16
+
+### Added
+- **Multi-Device & Responsive Design System**:
+  - Comprehensive CSS media queries for desktop, tablet (`<=1024px`), mobile (`<=768px`), and small mobile phones (`<=480px`).
+  - Mobile slide-over drawer navigation for `#chatSidebar` with smooth touch backdrop blur (`.sidebar-backdrop`).
+  - Auto-closing sidebar drawer upon thread selection or new chat creation on touch devices.
+  - Responsive ASCII banner scaling (`min(2.1vw, 8.5px)`) and single-column quick action chips for mobile screens.
+  - Adaptive Powerline statusline hiding non-essential segments on narrow screens while preserving active mode, git branch, and LLM model info.
+  - Touch-friendly command line textarea, action buttons, and responsive modal dialogs.
+- **Dual Parameter Compatibility in Chat Schema**:
+  - Support for `query` and `prompt` interchangeably in `ChatRequest` Pydantic model with automatic post-initialization resolution.
+
+### Changed
+- Bumped project version to `0.2.0` across packaging, server metadata, and UI headers.
+
+---
+
+## [0.1.4] - 2026-08-16
+
+### Added
+- **Security Patches**:
+  - Cryptographic validation for Google OAuth Identity Services tokens with unverified token rejection.
+  - IDOR protection on conversation chat streaming and message fetching.
+  - Stricter workspace boundary enforcement and bash regex command filters.
+
+---
+
 
 ### Added
 - **Developer Guidelines & Changelog**: Added `AGENTS.md` and `CHANGELOG.md` to the project root.

@@ -5,7 +5,7 @@
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-0.1.4-green.svg)](https://github.com/enky-yy/Syntrak)
+[![Version](https://img.shields.io/badge/version-0.2.0-green.svg)](https://github.com/enky-yy/Syntrak)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-syntrak.harsh--shah.me-2ea44f.svg)](https://syntrak.harsh-shah.me)
 
 🌐 **Live Demo**: [https://syntrak.harsh-shah.me](https://syntrak.harsh-shah.me) | 📐 **[Architecture & Implementation Plan](ARCHITECTURE.md)**
@@ -18,6 +18,7 @@
 - ⚡ **Dual Operating Modes**:
   - **Chat Mode** *(Default)*: Clean, neutral conversational AI (like ChatGPT) for answering programming questions, architecture discussions, and algorithm design without tool clutter.
   - **Agent Mode**: Full autonomous repo workspace operations with targeted search-and-replace edits (`replace_in_file`), bash commands, and git checkpoints.
+- 📱 **Multi-Device & Responsive Web Console**: Complete mobile, tablet, and desktop layout optimization with slide-over drawer navigation, touch-friendly command line, backdrop blur, adaptive Powerline statusline, and responsive modal dialogues.
 - 🔗 **GitHub Repository Connection**: Connect and clone remote GitHub repositories dynamically with custom branch checkout and branch tracking directly inside the web interface.
 - 🛡️ **Safety & Policy Guardrails Engine**: Dedicated multi-layered security filter (`syntrak.core.guardrails`) that intercepts prompt injections, jailbreaks, secret exfiltration, malicious shell commands, and malware generation.
 - 💻 **Neovim & Tmux Monospace Web Console**: High-density developer dashboard (`syntrak.nvim`) running in your browser with buffer tabs, statusline diagnostics, animated thinking pulses, and 5 classic color schemes.

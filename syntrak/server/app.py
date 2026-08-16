@@ -53,7 +53,7 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
     app = FastAPI(
         title="Syntrak API & Web UI",
         description="REST & SSE Streaming API, Google Authentication, and Chat History for Syntrak",
-        version="0.1.0"
+        version="0.2.0"
     )
 
     allowed_origins_env = os.getenv("SYNTRAK_ALLOWED_ORIGINS", "")
