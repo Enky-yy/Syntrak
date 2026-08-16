@@ -17,10 +17,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Security & Authorization Hardening**:
   - Ephemeral cryptographically random JWT secret generation in local mode (`secrets.token_urlsafe(32)`) and mandatory secret requirement in production.
   - Added user authentication dependencies (`Depends(get_current_user)`) across all state-mutating control endpoints (`/api/model`, `/api/diff`, `/api/undo`, `/api/clear`).
-  - Isolated GitHub Personal Access Tokens (PAT) to request execution environments instead of process-wide `os.environ` mutation.
-  - Added automated security policy blocking reads and modifications of sensitive credential files (`.env`, `*token*.txt`, `*.token`, `id_rsa`, `*.pem`, `*.key`) across all file ops.
-  - Added branch format sanitization in `git_diff` preventing argument and flag injection.
-  - Added regex command blocking in `execute_command` preventing shell extraction of private keys and password files.
+  - Added security response headers middleware (`X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `X-XSS-Protection`).
+  - Added SSRF protection blocking internal cloud metadata services (`169.254.169.254`, `metadata.google.internal`) in custom API bases.
+  - Excluded sensitive secret files from `search_files` and `list_directory` to prevent accidental credential indexing.
+  - Enforced strict default workspace boundary containment on relative paths even when `SYNTRAK_WORKSPACE_ROOT` is unset.
+  - Implemented in-memory sliding window rate limiter for expensive endpoints (`/api/chat/stream`, `/api/repo/connect`).
 
 ### Changed
 - Bumped project version to `0.2.0` across packaging, server metadata, and UI headers.

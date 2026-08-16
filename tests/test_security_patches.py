@@ -126,3 +126,71 @@ def test_git_diff_branch_injection_protection():
     res = git_diff(target_branch="--output=/tmp/evil")
     assert "Security Violation" in res
     assert "Invalid branch name" in res
+
+
+def test_search_and_list_files_redacts_secrets(tmp_path, monkeypatch):
+    """Verify list_directory and search_files completely hide sensitive secret files."""
+    from syntrak.tools.file_ops import list_directory, search_files
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "main.py").write_text("print('hello world')")
+    (workspace / ".env").write_text("SECRET_API_KEY=12345")
+    (workspace / "pypi_token.txt").write_text("pypi_secret_token_abc")
+
+    monkeypatch.setenv("SYNTRAK_WORKSPACE_ROOT", str(workspace))
+
+    # list_directory must not list .env or pypi_token.txt
+    list_out = list_directory()
+    assert "main.py" in list_out
+    assert ".env" not in list_out
+    assert "pypi_token.txt" not in list_out
+
+    # search_files must not index or return .env or pypi_token.txt matches
+    search_out = search_files(query="SECRET")
+    assert "No matches found" in search_out
+    assert ".env" not in search_out
+    assert "pypi_token.txt" not in search_out
+
+
+def test_default_workspace_containment_without_env(tmp_path, monkeypatch):
+    """Verify boundary containment defaults to Path.cwd() when SYNTRAK_WORKSPACE_ROOT is unset."""
+    monkeypatch.delenv("SYNTRAK_WORKSPACE_ROOT", raising=False)
+    monkeypatch.chdir(tmp_path)
+
+    # File inside current working dir
+    (tmp_path / "valid.py").write_text("pass")
+    resolved = _resolve_path("valid.py")
+    assert resolved == (tmp_path / "valid.py").resolve()
+
+    # Traversal outside current working dir must be blocked
+    with pytest.raises(PermissionError):
+        _resolve_path("../outside.txt")
+
+
+@pytest.mark.asyncio
+async def test_security_headers_and_ssrf_protection(temp_db):
+    """Verify security HTTP headers and SSRF blocking on cloud metadata."""
+    cfg = SyntrakConfig()
+    app = create_app(config=cfg, db=temp_db)
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Security headers
+        res = await client.get("/api/session/status")
+        assert res.headers["X-Frame-Options"] == "SAMEORIGIN"
+        assert res.headers["X-Content-Type-Options"] == "nosniff"
+        assert res.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+
+        # SSRF blocked against AWS/GCP metadata endpoints
+        res_ssrf1 = await client.post(
+            "/api/model",
+            json={"model": "openai/gpt-4o", "api_base": "http://169.254.169.254/latest/meta-data/"}
+        )
+        assert res_ssrf1.status_code == 400
+        assert "SSRF protection policy" in res_ssrf1.json()["detail"]
+
+        res_ssrf2 = await client.post(
+            "/api/model",
+            json={"model": "openai/gpt-4o", "api_base": "http://metadata.google.internal/computeMetadata/v1/"}
+        )
+        assert res_ssrf2.status_code == 400
+        assert "SSRF protection policy" in res_ssrf2.json()["detail"]

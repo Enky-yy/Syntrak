@@ -9,11 +9,15 @@ from fastapi import Header, HTTPException, Request
 
 def _get_jwt_secret() -> str:
     """Retrieve configured JWT secret, or generate a cryptographically secure ephemeral key."""
-    secret = os.getenv("SYNTRAK_JWT_SECRET")
+    secret = (
+        os.getenv("SYNTRAK_JWT_SECRET")
+        or os.getenv("JWT_SECRET_KEY")
+        or os.getenv("JWT_SECRET")
+    )
     if secret and secret.strip():
         return secret.strip()
     if os.getenv("PRODUCTION", "").lower() in ("true", "1", "yes"):
-        raise RuntimeError("CRITICAL SECURITY ERROR: SYNTRAK_JWT_SECRET must be set in production mode.")
+        raise RuntimeError("CRITICAL SECURITY ERROR: SYNTRAK_JWT_SECRET or JWT_SECRET_KEY must be set in production mode.")
     if not hasattr(_get_jwt_secret, "_cached_dev_secret"):
         _get_jwt_secret._cached_dev_secret = secrets.token_urlsafe(32)
     return _get_jwt_secret._cached_dev_secret

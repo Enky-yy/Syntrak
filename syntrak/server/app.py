@@ -1,12 +1,14 @@
 """FastAPI server exposing Syntrak core engine, Google Auth, and Chat History."""
 
+from collections import defaultdict
 import json
 import os
 from pathlib import Path
 import re
 import subprocess
+import time
 from typing import AsyncGenerator, Dict, List, Optional
-from fastapi import Depends, FastAPI, HTTPException, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -45,7 +47,50 @@ from syntrak.server.schemas import (
     UpdateConversationRequest,
     UserResponse,
 )
-from syntrak.tools.git_ops import git_diff, git_get_branch, git_get_remote_url, git_status
+from syntrak.tools.git_ops import (
+    git_diff,
+    git_get_branch,
+    git_get_remote_url,
+    git_status,
+)
+
+BLOCKED_SSRF_HOSTS = [
+    "169.254.169.254",
+    "metadata.google.internal",
+    "metadata.google",
+    "100.100.100.200",
+]
+
+
+def _validate_api_base_ssrf(api_base: Optional[str]) -> None:
+    """Validate that custom API base URLs do not target internal cloud metadata endpoints."""
+    if not api_base or not api_base.strip():
+        return
+    cleaned = api_base.strip().lower()
+    for blocked in BLOCKED_SSRF_HOSTS:
+        if blocked in cleaned:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Security Violation: Target host '{blocked}' is blocked by SSRF protection policy."
+            )
+
+
+# In-memory sliding window rate limiter
+_request_rate_log: Dict[str, List[float]] = defaultdict(list)
+
+
+def _check_rate_limit(client_id: str, max_requests: int = 60, window_seconds: int = 60) -> None:
+    """Check and record client request timestamps for rate limiting."""
+    now = time.time()
+    timestamps = _request_rate_log[client_id]
+    # Prune timestamps outside window
+    _request_rate_log[client_id] = [t for t in timestamps if now - t < window_seconds]
+    if len(_request_rate_log[client_id]) >= max_requests:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded ({max_requests} requests per {window_seconds}s). Please slow down."
+        )
+    _request_rate_log[client_id].append(now)
 
 
 def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
@@ -56,6 +101,16 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
         version="0.2.0"
     )
 
+    # Security Headers Middleware
+    @app.middleware("http")
+    async def add_security_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        return response
+
     allowed_origins_env = os.getenv("SYNTRAK_ALLOWED_ORIGINS", "")
     if allowed_origins_env:
         allowed_origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
@@ -63,6 +118,8 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
         allowed_origins = [
             "http://localhost:8000",
             "http://127.0.0.1:8000",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
             "http://localhost:9000",
             "http://127.0.0.1:9000",
             "https://syntrak.harsh-shah.me"
@@ -242,7 +299,8 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
 
     @app.post("/api/model")
     async def switch_model(req: SwitchModelRequest, user: Dict = Depends(get_current_user)):
-        """Switch active LLM model/endpoint or update google_client_id."""
+        """Switch active LLM model/endpoint or update google_client_id with SSRF check."""
+        _validate_api_base_ssrf(req.api_base)
         session.set_model(model_name=req.model, api_base=req.api_base, api_key=req.api_key)
         if req.google_client_id is not None:
             session.config.google_client_id = req.google_client_id.strip() or None
@@ -292,6 +350,7 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
     @app.post("/api/repo/connect", response_model=ConnectGithubRepoResponse)
     async def connect_repo(req: ConnectGithubRepoRequest, user: Dict = Depends(get_current_user)):
         """Connect and clone/checkout user's GitHub repository for Agent Mode."""
+        _check_rate_limit(client_id=f"repo_{user['id']}", max_requests=10, window_seconds=60)
         if not req.repo_url:
             raise HTTPException(status_code=400, detail="Please provide a GitHub repository URL or owner/repo (e.g. 'username/repo-name').")
 
@@ -374,6 +433,7 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
     @app.post("/api/chat/stream")
     async def chat_stream(req: ChatRequest, user: Dict = Depends(get_current_user)):
         """Stream agent events as SSE and persist messages to active conversation."""
+        _check_rate_limit(client_id=f"stream_{user['id']}", max_requests=60, window_seconds=60)
         # Ensure or create active conversation
         conv_id = req.conversation_id
         if not conv_id:

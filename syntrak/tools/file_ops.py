@@ -17,13 +17,17 @@ BLOCKED_FILE_PATTERNS = [
 ]
 
 
+def _is_blocked_file(filename: str) -> bool:
+    """Check if a filename matches sensitive secret file patterns."""
+    return any(re.search(pat, filename) for pat in BLOCKED_FILE_PATTERNS)
+
+
 def _resolve_path(path_str: str) -> Path:
     p = Path(path_str).expanduser()
 
     # Block access to known sensitive secret files
-    for pat in BLOCKED_FILE_PATTERNS:
-        if re.search(pat, p.name):
-            raise PermissionError(f"Access denied: Target '{p.name}' is classified as a sensitive secret file and blocked by security policy.")
+    if _is_blocked_file(p.name):
+        raise PermissionError(f"Access denied: Target '{p.name}' is classified as a sensitive secret file and blocked by security policy.")
 
     ws = os.environ.get("SYNTRAK_WORKSPACE_ROOT")
     if ws:
@@ -40,7 +44,16 @@ def _resolve_path(path_str: str) -> Path:
             raise PermissionError(f"Access denied: Path '{path_str}' is outside the authorized workspace directory '{ws_path}'.")
         return resolved
 
-    return p.resolve()
+    # In standalone CLI mode without explicit SYNTRAK_WORKSPACE_ROOT:
+    resolved = p.resolve()
+    if not p.is_absolute():
+        cwd_path = Path.cwd().resolve()
+        try:
+            resolved.relative_to(cwd_path)
+        except ValueError:
+            raise PermissionError(f"Access denied: Path '{path_str}' is outside current working directory '{cwd_path}'.")
+
+    return resolved
 
 
 @default_registry.register(
@@ -204,13 +217,13 @@ def list_directory(dir_path: str = ".", recursive: bool = False, max_depth: int 
 
                 file_indent = "  " * (curr_depth + (1 if rel_root != "." else 0))
                 for f in sorted(files):
-                    if not f.startswith("."):
+                    if not f.startswith(".") and not _is_blocked_file(f):
                         f_path = os.path.join(root, f)
                         size = os.path.getsize(f_path)
                         entries.append(f"{file_indent}📄 {f} ({size} bytes)")
         else:
             for item in sorted(path.iterdir()):
-                if item.name.startswith(".") or item.name in ("venv", ".venv", "__pycache__", "node_modules"):
+                if item.name.startswith(".") or item.name in ("venv", ".venv", "__pycache__", "node_modules") or _is_blocked_file(item.name):
                     continue
                 if item.is_dir():
                     entries.append(f"📁 {item.name}/")
@@ -250,7 +263,7 @@ def search_files(query: str, dir_path: str = ".", file_pattern: Optional[str] = 
         dirs[:] = [d for d in dirs if d not in ignored_dirs and not d.startswith(".")]
 
         for file in files:
-            if file.startswith("."):
+            if file.startswith(".") or _is_blocked_file(file):
                 continue
             if file_pattern and not file.endswith(file_pattern.replace("*", "")):
                 continue
