@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 from typing import Any, Dict, List, Optional
 from syntrak.tools.base import default_registry
+from syntrak.tools.file_ops import _is_blocked_file
 from syntrak.tools.git_ops import git_diff
 
 
@@ -35,6 +36,8 @@ def analyze_diff_for_review(staged: bool = False, target_branch: Optional[str] =
     for fdiff in file_diffs:
         header_match = re.search(r"a/(\S+)\s+b/(\S+)", fdiff)
         fname = header_match.group(2) if header_match else "unknown_file"
+        if _is_blocked_file(Path(fname).name):
+            continue
 
         additions = len(re.findall(r"^\+[^+]", fdiff, flags=re.MULTILINE))
         deletions = len(re.findall(r"^-[^-]", fdiff, flags=re.MULTILINE))

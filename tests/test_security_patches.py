@@ -314,3 +314,18 @@ async def test_bash_ops_scrubs_secrets_and_containment(tmp_path, monkeypatch):
     res_outside = await execute_command("pwd", cwd=str(secret_dir))
     assert "Security Violation" in res_outside
     assert "outside the authorized workspace directory" in res_outside
+
+
+def test_build_repo_map_filters_secret_files(tmp_path):
+    """Verify build_repo_map completely excludes secret files from context."""
+    from syntrak.core.context import build_repo_map
+    (tmp_path / "main.py").write_text("print('hello')")
+    (tmp_path / ".env").write_text("SECRET=123")
+    (tmp_path / "pypi_token.txt").write_text("token_secret")
+    (tmp_path / "id_rsa").write_text("private_key")
+
+    repo_map = build_repo_map(workspace_root=str(tmp_path))
+    assert "main.py" in repo_map
+    assert ".env" not in repo_map
+    assert "pypi_token.txt" not in repo_map
+    assert "id_rsa" not in repo_map

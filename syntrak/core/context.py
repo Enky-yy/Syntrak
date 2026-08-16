@@ -1,8 +1,7 @@
-"""Repository context and file tree mapper for Syntrak."""
-
 import os
 from pathlib import Path
 from typing import List, Set
+from syntrak.tools.file_ops import _is_blocked_file
 
 
 DEFAULT_IGNORED = {
@@ -63,7 +62,7 @@ def build_repo_map(workspace_root: str = ".", max_depth: int = 3, max_files: int
 
         file_indent = "  " * (depth + (1 if rel_dir != "." else 0))
         for file in sorted(files):
-            if file.startswith(".") or file in ignored:
+            if file.startswith(".") or file in ignored or _is_blocked_file(file):
                 continue
 
             file_count += 1

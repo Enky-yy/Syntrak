@@ -36,6 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Integrated `DOMPurify` HTML sanitization for all frontend markdown parsing to eliminate stored and DOM-based Cross-Site Scripting (XSS).
   - Added secret credential scrubbing and 500 KB output buffer truncation to `execute_command` (`bash_ops.py`).
   - Enforced workspace boundary containment on `cwd` in shell execution to prevent arbitrary directory escape.
+  - Excluded sensitive secret files and credentials from repository directory trees (`build_repo_map`) and code review diff summaries (`review_ops.py`).
 
 ### Changed
 - Bumped project version to `0.2.0` across packaging, server metadata, and UI headers.
