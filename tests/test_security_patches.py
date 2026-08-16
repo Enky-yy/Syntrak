@@ -293,3 +293,24 @@ async def test_guest_session_isolation(temp_db):
         assert res.status_code == 200
         assert res.json()["id"] == "guest_custom_123"
         assert res.json()["email"] == "guest_custom_123@local.user"
+
+
+@pytest.mark.asyncio
+async def test_bash_ops_scrubs_secrets_and_containment(tmp_path, monkeypatch):
+    """Verify execute_command scrubs secrets and validates cwd boundaries."""
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    secret_dir = tmp_path / "secret"
+    secret_dir.mkdir()
+
+    monkeypatch.setenv("SYNTRAK_WORKSPACE_ROOT", str(workspace))
+
+    # Secret output scrubbing
+    res_echo = await execute_command("echo 'sk-1234567890abcdef1234567890'")
+    assert "sk-1234567890" not in res_echo
+    assert "[REDACTED_SECRET]" in res_echo
+
+    # Working directory containment
+    res_outside = await execute_command("pwd", cwd=str(secret_dir))
+    assert "Security Violation" in res_outside
+    assert "outside the authorized workspace directory" in res_outside

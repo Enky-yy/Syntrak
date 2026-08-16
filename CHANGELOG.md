@@ -33,6 +33,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Added 30-second execution timeouts and `subprocess.TimeoutExpired` safety handlers to all git operations.
   - Hardened XML and Markdown tool parsers against ReDoS with maximum 1 MB scan buffer limits.
   - Partitioned guest sessions via custom `X-Guest-ID` and `syntrak_guest_id` cookies to prevent cross-tenant conversation collision.
+  - Integrated `DOMPurify` HTML sanitization for all frontend markdown parsing to eliminate stored and DOM-based Cross-Site Scripting (XSS).
+  - Added secret credential scrubbing and 500 KB output buffer truncation to `execute_command` (`bash_ops.py`).
+  - Enforced workspace boundary containment on `cwd` in shell execution to prevent arbitrary directory escape.
 
 ### Changed
 - Bumped project version to `0.2.0` across packaging, server metadata, and UI headers.

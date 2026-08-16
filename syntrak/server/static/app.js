@@ -83,6 +83,18 @@ async function fetchUserProfile() {
   }
 }
 
+function renderMarkdownSafe(mdText) {
+  if (!mdText) return '';
+  if (window.marked && typeof window.marked.parse === 'function') {
+    const rawHtml = marked.parse(mdText);
+    if (window.DOMPurify && typeof window.DOMPurify.sanitize === 'function') {
+      return DOMPurify.sanitize(rawHtml);
+    }
+    return rawHtml;
+  }
+  return escapeHtml(mdText);
+}
+
 function renderUserProfile(user) {
   const authBox = document.getElementById('authBox');
   const userCard = document.getElementById('userCard');
@@ -91,7 +103,7 @@ function renderUserProfile(user) {
   const userAvatar = document.getElementById('userAvatar');
   const userAvatarFallback = document.getElementById('userAvatarFallback');
 
-  if (user && user.id && user.id !== 'guest-developer') {
+  if (user && user.id && !user.id.startsWith('guest')) {
     currentUser = user;
     if (authBox) authBox.style.display = 'none';
     if (userCard) userCard.style.display = 'flex';
@@ -400,11 +412,7 @@ function renderConversationMessages(messages) {
       const mdText = msg.content || '';
       const textDiv = document.createElement('div');
       textDiv.className = 'markdown-rendered';
-      if (window.marked && typeof window.marked.parse === 'function') {
-        textDiv.innerHTML = marked.parse(mdText);
-      } else {
-        textDiv.textContent = mdText;
-      }
+      textDiv.innerHTML = renderMarkdownSafe(mdText);
       contentEl.appendChild(textDiv);
 
       if (window.Prism) {
@@ -1070,11 +1078,7 @@ function handleAgentEvent(event, contentEl, accumulatedMd, setMdCallback) {
       contentEl.appendChild(textDiv);
     }
 
-    if (window.marked && typeof window.marked.parse === 'function') {
-      textDiv.innerHTML = marked.parse(newMd);
-    } else {
-      textDiv.textContent = newMd;
-    }
+    textDiv.innerHTML = renderMarkdownSafe(newMd);
 
     if (window.Prism) {
       textDiv.querySelectorAll('pre code').forEach((block) => {

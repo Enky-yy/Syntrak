@@ -2,12 +2,12 @@
 
 import asyncio
 import os
+import re
 import shlex
 from typing import Dict, List, Optional
+from syntrak.core.agent import scrub_secrets
 from syntrak.tools.base import default_registry
-
-
-import re
+from syntrak.tools.file_ops import _resolve_path
 
 BLOCKED_COMMAND_REGEXES = [
     r"(?i)\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*)\s+(/|/\*|--no-preserve-root)\b",
@@ -23,6 +23,8 @@ BLOCKED_COMMAND_REGEXES = [
     r"(?i)\b(cat|head|tail|more|less|grep|awk|sed)\s+.*(/etc/shadow|/etc/master\.passwd|\.ssh/id_|\.env|pypi_token\.txt|\.token)",
 ]
 
+MAX_BASH_OUTPUT_BYTES = 500 * 1024  # 500 KB limit
+
 
 @default_registry.register(
     name="execute_command",
@@ -34,9 +36,12 @@ async def execute_command(command: str, timeout_seconds: int = 60, cwd: Optional
         if re.search(pattern, command):
             return f"Security Violation: Command '{command}' was blocked due to dangerous pattern matching."
 
-    # Safeguard working directory: fall back to current working dir if passed path does not exist
-    if cwd and os.path.isdir(cwd):
-        working_dir = cwd
+    # Validate working directory against workspace boundary
+    if cwd:
+        try:
+            working_dir = str(_resolve_path(cwd))
+        except PermissionError as pe:
+            return f"Security Violation: {str(pe)}"
     else:
         working_dir = os.environ.get("SYNTRAK_WORKSPACE_ROOT") or os.getcwd()
 
@@ -60,6 +65,12 @@ async def execute_command(command: str, timeout_seconds: int = 60, cwd: Optional
         stdout_str = stdout.decode("utf-8", errors="replace")
         stderr_str = stderr.decode("utf-8", errors="replace")
 
+        # Truncate output if exceeding maximum buffer
+        if len(stdout_str) > MAX_BASH_OUTPUT_BYTES:
+            stdout_str = stdout_str[:MAX_BASH_OUTPUT_BYTES] + "\n... [stdout truncated to 500 KB limit]"
+        if len(stderr_str) > MAX_BASH_OUTPUT_BYTES:
+            stderr_str = stderr_str[:MAX_BASH_OUTPUT_BYTES] + "\n... [stderr truncated to 500 KB limit]"
+
         exit_code = proc.returncode
         output_parts = []
         if stdout_str:
@@ -71,6 +82,8 @@ async def execute_command(command: str, timeout_seconds: int = 60, cwd: Optional
         if not combined:
             combined = "(No output produced)"
 
-        return f"Exit Code: {exit_code}\nOutput:\n{combined}"
+        # Scrub sensitive credentials from shell output
+        sanitized_output = scrub_secrets(combined)
+        return f"Exit Code: {exit_code}\nOutput:\n{sanitized_output}"
     except Exception as e:
         return f"Failed to execute command '{command}': {str(e)}"
