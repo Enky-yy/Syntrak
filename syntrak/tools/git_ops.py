@@ -44,12 +44,16 @@ def git_status() -> str:
     description="Get diff of uncommitted changes, staged changes, or compare against a branch."
 )
 def git_diff(staged: bool = False, target_branch: Optional[str] = None, file_path: Optional[str] = None) -> str:
-    """Get git diff output."""
+    """Get git diff output with flag injection sanitization."""
+    import re
     args = ["diff"]
     if staged:
         args.append("--staged")
     if target_branch:
-        args.append(target_branch)
+        cleaned = target_branch.strip()
+        if cleaned.startswith("-") or not re.match(r"^[a-zA-Z0-9_\-\./]+$", cleaned):
+            return f"Security Violation: Invalid branch name format '{target_branch}'."
+        args.append(cleaned)
     if file_path:
         args.extend(["--", file_path])
 

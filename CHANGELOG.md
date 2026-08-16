@@ -14,8 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Responsive ASCII banner scaling (`min(2.1vw, 8.5px)`) and single-column quick action chips for mobile screens.
   - Adaptive Powerline statusline hiding non-essential segments on narrow screens while preserving active mode, git branch, and LLM model info.
   - Touch-friendly command line textarea, action buttons, and responsive modal dialogs.
-- **Dual Parameter Compatibility in Chat Schema**:
-  - Support for `query` and `prompt` interchangeably in `ChatRequest` Pydantic model with automatic post-initialization resolution.
+- **Security & Authorization Hardening**:
+  - Ephemeral cryptographically random JWT secret generation in local mode (`secrets.token_urlsafe(32)`) and mandatory secret requirement in production.
+  - Added user authentication dependencies (`Depends(get_current_user)`) across all state-mutating control endpoints (`/api/model`, `/api/diff`, `/api/undo`, `/api/clear`).
+  - Isolated GitHub Personal Access Tokens (PAT) to request execution environments instead of process-wide `os.environ` mutation.
+  - Added automated security policy blocking reads and modifications of sensitive credential files (`.env`, `*token*.txt`, `*.token`, `id_rsa`, `*.pem`, `*.key`) across all file ops.
+  - Added branch format sanitization in `git_diff` preventing argument and flag injection.
+  - Added regex command blocking in `execute_command` preventing shell extraction of private keys and password files.
 
 ### Changed
 - Bumped project version to `0.2.0` across packaging, server metadata, and UI headers.

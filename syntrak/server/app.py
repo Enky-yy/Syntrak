@@ -241,7 +241,7 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
 
 
     @app.post("/api/model")
-    async def switch_model(req: SwitchModelRequest):
+    async def switch_model(req: SwitchModelRequest, user: Dict = Depends(get_current_user)):
         """Switch active LLM model/endpoint or update google_client_id."""
         session.set_model(model_name=req.model, api_base=req.api_base, api_key=req.api_key)
         if req.google_client_id is not None:
@@ -249,9 +249,14 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
         return {"status": "success", "active_model": session.config.llm.model, "google_client_id": session.config.google_client_id}
 
     @app.get("/api/diff")
-    async def get_diff(staged: bool = False, target_branch: str = None):
-        """Get git diff for web visualization."""
-        diff_text = git_diff(staged=staged, target_branch=target_branch)
+    async def get_diff(staged: bool = False, target_branch: Optional[str] = None, user: Dict = Depends(get_current_user)):
+        """Get git diff for web visualization with branch input sanitization."""
+        cleaned_branch = None
+        if target_branch:
+            cleaned_branch = target_branch.strip()
+            if cleaned_branch.startswith("-") or not re.match(r"^[a-zA-Z0-9_\-\./]+$", cleaned_branch):
+                raise HTTPException(status_code=400, detail="Invalid target branch name format.")
+        diff_text = git_diff(staged=staged, target_branch=cleaned_branch)
         return {"diff": diff_text}
 
     @app.get("/api/repo/info", response_model=RepoInfoResponse)
@@ -273,9 +278,11 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
 
     @app.post("/api/repo/authorize")
     async def authorize_repo(req: AuthorizeRepoRequest, user: Dict = Depends(get_current_user)):
-        """Authorize repository access for Agent Mode."""
+        """Authorize repository access for Agent Mode without mutating global process environment."""
         if req.github_token:
-            os.environ["GITHUB_TOKEN"] = req.github_token.strip()
+            session.github_token = req.github_token.strip()
+        elif not req.grant:
+            session.github_token = None
         return {
             "status": "success",
             "granted": req.grant,
@@ -314,16 +321,19 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
         if not str(target_repo_dir).startswith(str(workspaces_dir.resolve())):
             raise HTTPException(status_code=400, detail="Invalid workspace path target.")
 
-        token = req.github_token.strip() if req.github_token else os.getenv("GITHUB_TOKEN")
+        token = req.github_token.strip() if req.github_token else getattr(session, "github_token", None) or os.getenv("GITHUB_TOKEN")
         clone_url = cleaned_url
         if token and clone_url.startswith("https://github.com/"):
             clone_url = clone_url.replace("https://github.com/", f"https://{token}@github.com/")
-            os.environ["GITHUB_TOKEN"] = token
+
+        git_env = os.environ.copy()
+        if token:
+            git_env["GITHUB_TOKEN"] = token
 
         if target_repo_dir.exists() and (target_repo_dir / ".git").exists():
             try:
-                subprocess.run(["git", "fetch"], cwd=str(target_repo_dir), capture_output=True, text=True, check=False)
-                subprocess.run(["git", "checkout", branch], cwd=str(target_repo_dir), capture_output=True, text=True, check=False)
+                subprocess.run(["git", "fetch"], cwd=str(target_repo_dir), capture_output=True, text=True, check=False, env=git_env)
+                subprocess.run(["git", "checkout", branch], cwd=str(target_repo_dir), capture_output=True, text=True, check=False, env=git_env)
             except Exception:
                 pass
         else:
@@ -332,9 +342,9 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
             if branch:
                 clone_cmd.extend(["-b", branch])
             clone_cmd.extend([clone_url, str(target_repo_dir)])
-            res = subprocess.run(clone_cmd, capture_output=True, text=True, check=False)
+            res = subprocess.run(clone_cmd, capture_output=True, text=True, check=False, env=git_env)
             if res.returncode != 0:
-                res_fallback = subprocess.run(["git", "clone", "--depth", "50", clone_url, str(target_repo_dir)], capture_output=True, text=True, check=False)
+                res_fallback = subprocess.run(["git", "clone", "--depth", "50", clone_url, str(target_repo_dir)], capture_output=True, text=True, check=False, env=git_env)
                 if res_fallback.returncode != 0:
                     err_msg = res.stderr.strip() or res_fallback.stderr.strip()
                     if token:
@@ -342,10 +352,12 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
                     raise HTTPException(status_code=400, detail=f"Failed to clone GitHub repository: {err_msg}")
 
         # Sanitize remote origin URL so tokens are never persisted in .git/config
-        subprocess.run(["git", "remote", "set-url", "origin", cleaned_url], cwd=str(target_repo_dir), capture_output=True, text=True, check=False)
+        subprocess.run(["git", "remote", "set-url", "origin", cleaned_url], cwd=str(target_repo_dir), capture_output=True, text=True, check=False, env=git_env)
 
         session.set_workspace(str(target_repo_dir))
         session.has_connected_repo = True
+        if token:
+            session.github_token = token
         actual_branch = git_get_branch(cwd=str(target_repo_dir)) or branch
         remote_origin = git_get_remote_url(cwd=str(target_repo_dir)) or raw_url
 
@@ -441,13 +453,13 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
         )
 
     @app.post("/api/undo")
-    async def undo_change():
+    async def undo_change(user: Dict = Depends(get_current_user)):
         """Undo last agent action via git snapshot."""
         res = session.undo_last_change()
         return {"result": res}
 
     @app.post("/api/clear")
-    async def clear_memory():
+    async def clear_memory(user: Dict = Depends(get_current_user)):
         """Reset conversation memory."""
         session.memory.clear()
         return {"status": "success"}

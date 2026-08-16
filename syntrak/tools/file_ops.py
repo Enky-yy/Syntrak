@@ -7,8 +7,24 @@ from typing import Dict, List, Optional
 from syntrak.tools.base import default_registry
 
 
+BLOCKED_FILE_PATTERNS = [
+    r"(?i)^\.env(\..+)?$",
+    r"(?i)^.*token.*\.txt$",
+    r"(?i)^.*\.token$",
+    r"(?i)^id_rsa(\.pub)?$",
+    r"(?i)^.*\.pem$",
+    r"(?i)^.*\.key$",
+]
+
+
 def _resolve_path(path_str: str) -> Path:
     p = Path(path_str).expanduser()
+
+    # Block access to known sensitive secret files
+    for pat in BLOCKED_FILE_PATTERNS:
+        if re.search(pat, p.name):
+            raise PermissionError(f"Access denied: Target '{p.name}' is classified as a sensitive secret file and blocked by security policy.")
+
     ws = os.environ.get("SYNTRAK_WORKSPACE_ROOT")
     if ws:
         ws_path = Path(ws).expanduser().resolve()

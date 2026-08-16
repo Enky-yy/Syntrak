@@ -94,3 +94,35 @@ async def test_bash_ops_regex_security_filters():
     # Fork bomb
     res3 = await execute_command(":(){ :|:& };:")
     assert "Security Violation" in res3
+
+    # Secret exfiltration via cat
+    res4 = await execute_command("cat ~/.ssh/id_rsa")
+    assert "Security Violation" in res4
+
+
+def test_secret_file_protection(tmp_path, monkeypatch):
+    """Verify that sensitive secret files (.env, tokens) cannot be read via file ops."""
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    env_file = workspace / ".env"
+    env_file.write_text("OPENAI_API_KEY=sk-test123456")
+    token_file = workspace / "pypi_token.txt"
+    token_file.write_text("pypi-secret-token")
+
+    monkeypatch.setenv("SYNTRAK_WORKSPACE_ROOT", str(workspace))
+
+    res_env = read_file(".env")
+    assert "Security Violation" in res_env
+    assert "sensitive secret file" in res_env
+
+    res_token = read_file("pypi_token.txt")
+    assert "Security Violation" in res_token
+    assert "sensitive secret file" in res_token
+
+
+def test_git_diff_branch_injection_protection():
+    """Verify git diff rejects flag injection in target_branch."""
+    from syntrak.tools.git_ops import git_diff
+    res = git_diff(target_branch="--output=/tmp/evil")
+    assert "Security Violation" in res
+    assert "Invalid branch name" in res

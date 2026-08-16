@@ -1,13 +1,24 @@
-"""Google OAuth & JWT Session Authentication for Syntrak Server."""
-
 import os
+import secrets
 import time
 from typing import Any, Dict, Optional
 import httpx
 import jwt
 from fastapi import Header, HTTPException, Request
 
-JWT_SECRET = os.getenv("SYNTRAK_JWT_SECRET", "syntrak-dev-insecure-secret-key-change-in-prod")
+
+def _get_jwt_secret() -> str:
+    """Retrieve configured JWT secret, or generate a cryptographically secure ephemeral key."""
+    secret = os.getenv("SYNTRAK_JWT_SECRET")
+    if secret and secret.strip():
+        return secret.strip()
+    if os.getenv("PRODUCTION", "").lower() in ("true", "1", "yes"):
+        raise RuntimeError("CRITICAL SECURITY ERROR: SYNTRAK_JWT_SECRET must be set in production mode.")
+    if not hasattr(_get_jwt_secret, "_cached_dev_secret"):
+        _get_jwt_secret._cached_dev_secret = secrets.token_urlsafe(32)
+    return _get_jwt_secret._cached_dev_secret
+
+
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_SECONDS = 86400 * 30  # 30 days
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
@@ -68,13 +79,13 @@ def create_jwt_token(user_data: Dict[str, Any]) -> str:
         "iat": now,
         "exp": now + JWT_EXPIRATION_SECONDS
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return jwt.encode(payload, _get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
 def decode_jwt_token(token: str) -> Dict[str, Any]:
     """Decode and validate a JWT session token."""
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token, _get_jwt_secret(), algorithms=[JWT_ALGORITHM])
         return {
             "id": payload["sub"],
             "email": payload.get("email", ""),

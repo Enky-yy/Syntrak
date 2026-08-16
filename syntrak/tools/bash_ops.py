@@ -20,6 +20,7 @@ BLOCKED_COMMAND_REGEXES = [
     r"(?i)\bchown\s+(-R\s+)?\w+\s+/\b",
     r"(?i)\bcurl\s+[^|]+\|\s*(ba|z|da|k|t?c)?sh\b",
     r"(?i)\bwget\s+[^|]+\|\s*(ba|z|da|k|t?c)?sh\b",
+    r"(?i)\b(cat|head|tail|more|less|grep|awk|sed)\s+.*(/etc/shadow|/etc/master\.passwd|\.ssh/id_|\.env|pypi_token\.txt|\.token)",
 ]
 
 
