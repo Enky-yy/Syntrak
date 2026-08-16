@@ -243,3 +243,53 @@ def test_sqlite_wal_mode_and_pragmas(tmp_path):
         foreign_keys = s.execute(text("PRAGMA foreign_keys")).scalar()
         assert str(journal_mode).lower() == "wal"
         assert int(foreign_keys) == 1
+
+
+@pytest.mark.asyncio
+async def test_token_revocation_on_logout(temp_db):
+    """Verify that logging out revokes the JWT token from future authenticated requests."""
+    cfg = SyntrakConfig()
+    app = create_app(config=cfg, db=temp_db)
+    token = create_jwt_token({"id": "user_logout_test", "email": "logout@test.com", "name": "Logout Tester"})
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Valid authenticated call
+        res1 = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+        assert res1.status_code == 200
+        assert res1.json()["email"] == "logout@test.com"
+
+        # Logout revokes token
+        res_logout = await client.post("/api/auth/logout", headers={"Authorization": f"Bearer {token}"})
+        assert res_logout.status_code == 200
+
+        # Subsequent authenticated request with revoked token must be rejected
+        res2 = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+        # Defaults to guest when invalid/revoked
+        assert res2.json()["id"] == "guest-developer"
+
+
+@pytest.mark.asyncio
+async def test_csp_and_permissions_policy_headers(temp_db):
+    """Verify Content-Security-Policy and Permissions-Policy are present in responses."""
+    cfg = SyntrakConfig()
+    app = create_app(config=cfg, db=temp_db)
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        res = await client.get("/api/session/status")
+        assert "Content-Security-Policy" in res.headers
+        assert "Permissions-Policy" in res.headers
+        assert "camera=()" in res.headers["Permissions-Policy"]
+
+
+@pytest.mark.asyncio
+async def test_guest_session_isolation(temp_db):
+    """Verify guest requests with custom X-Guest-ID are partitioned."""
+    cfg = SyntrakConfig()
+    app = create_app(config=cfg, db=temp_db)
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        res = await client.get("/api/auth/me", headers={"X-Guest-ID": "guest_custom_123"})
+        assert res.status_code == 200
+        assert res.json()["id"] == "guest_custom_123"
+        assert res.json()["email"] == "guest_custom_123@local.user"

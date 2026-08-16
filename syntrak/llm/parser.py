@@ -5,16 +5,24 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 
+MAX_PARSE_LENGTH = 1_000_000  # 1 MB max parser scan buffer
+
+
 def parse_xml_tool_calls(text: str) -> Tuple[str, List[Dict[str, Any]]]:
-    """Parse <tool_call><name>...</name><arguments>...</arguments></tool_call> tags.
+    """Parse <tool_call><name>...</name><arguments>...</arguments></tool_call> tags safely.
     
     Returns:
         clean_text: Text with tool call tags stripped out.
         tool_calls: List of parsed tool call dicts in standard format:
                     [{'id': 'call_1', 'function': {'name': '...', 'arguments': '{...}'}}]
     """
+    if not text:
+        return "", []
+
+    scan_text = text[:MAX_PARSE_LENGTH]
+
     pattern = re.compile(
-        r"<tool_call>\s*<name>(.*?)</name>\s*<arguments>(.*?)</arguments>\s*</tool_call>",
+        r"<tool_call>\s*<name>([^<]{1,256})</name>\s*<arguments>(.*?)</arguments>\s*</tool_call>",
         re.DOTALL | re.IGNORECASE
     )
 
@@ -43,12 +51,17 @@ def parse_xml_tool_calls(text: str) -> Tuple[str, List[Dict[str, Any]]]:
         })
         return ""
 
-    clean_text = pattern.sub(_replacer, text).strip()
+    clean_text = pattern.sub(_replacer, scan_text).strip()
     return clean_text, tool_calls
 
 
 def parse_markdown_tool_calls(text: str) -> Tuple[str, List[Dict[str, Any]]]:
-    """Parse ```tool_call / ```json tool calling blocks when XML tags aren't used."""
+    """Parse ```tool_call / ```json tool calling blocks safely."""
+    if not text:
+        return "", []
+
+    scan_text = text[:MAX_PARSE_LENGTH]
+
     pattern = re.compile(
         r"^[ \t]*```(?:tool_call|json:tool|json)?\s*\n(.*?)\n[ \t]*```",
         re.DOTALL | re.MULTILINE | re.IGNORECASE

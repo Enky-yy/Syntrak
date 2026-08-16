@@ -8,7 +8,7 @@ import re
 import subprocess
 import time
 from typing import AsyncGenerator, Dict, List, Optional
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -27,6 +27,7 @@ from syntrak.core.session import SessionManager
 from syntrak.server.auth import (
     create_jwt_token,
     get_current_user,
+    revoke_jwt_token,
     verify_google_credential,
 )
 from syntrak.server.db import Database, default_db
@@ -109,6 +110,13 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; "
+            "img-src 'self' data: https:; "
+            "connect-src 'self' https://accounts.google.com https://oauth2.googleapis.com ws: wss:; "
+            "frame-src https://accounts.google.com;"
+        )
         return response
 
     # Maximum Request Body Size Middleware (5 MB limit)
@@ -190,8 +198,15 @@ def create_app(config: SyntrakConfig = None, db: Database = None) -> FastAPI:
         )
 
     @app.post("/api/auth/logout")
-    async def auth_logout(response: Response):
-        """Log out user and clear session cookie."""
+    async def auth_logout(request: Request, response: Response, authorization: Optional[str] = Header(None)):
+        """Log out user, revoke session token, and clear session cookie."""
+        token = None
+        if authorization and authorization.startswith("Bearer "):
+            token = authorization.split("Bearer ", 1)[1].strip()
+        elif "syntrak_token" in request.cookies:
+            token = request.cookies.get("syntrak_token")
+        if token:
+            revoke_jwt_token(token)
         response.delete_cookie(key="syntrak_token", path="/", httponly=True)
         return {"status": "success", "message": "Logged out successfully"}
 

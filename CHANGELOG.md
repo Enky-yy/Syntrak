@@ -28,6 +28,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Enabled SQLite Write-Ahead Logging (`PRAGMA journal_mode=WAL;`) and concurrency busy timeout (`5000ms`) to eliminate database write lock contention.
   - Added HTTP request body payload size limiting middleware (rejecting payloads > 5 MB with HTTP 413).
   - Enforced 5 MB maximum file read and search inspection limit to prevent Out-Of-Memory (OOM) Denial of Service.
+  - Implemented token revocation blocklist (`revoke_jwt_token`) upon `/api/auth/logout` preventing stateless JWT replay.
+  - Added `Content-Security-Policy` and `Permissions-Policy` defensive HTTP response headers.
+  - Added 30-second execution timeouts and `subprocess.TimeoutExpired` safety handlers to all git operations.
+  - Hardened XML and Markdown tool parsers against ReDoS with maximum 1 MB scan buffer limits.
+  - Partitioned guest sessions via custom `X-Guest-ID` and `syntrak_guest_id` cookies to prevent cross-tenant conversation collision.
 
 ### Changed
 - Bumped project version to `0.2.0` across packaging, server metadata, and UI headers.

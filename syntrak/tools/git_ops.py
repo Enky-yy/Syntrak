@@ -6,7 +6,7 @@ from typing import Dict, List, Optional
 from syntrak.tools.base import default_registry
 
 
-def _run_git(args: List[str], cwd: Optional[str] = None) -> str:
+def _run_git(args: List[str], cwd: Optional[str] = None, timeout: float = 30.0) -> str:
     import subprocess
     work_dir = cwd or os.environ.get("SYNTRAK_WORKSPACE_ROOT") or os.getcwd()
     try:
@@ -16,11 +16,14 @@ def _run_git(args: List[str], cwd: Optional[str] = None) -> str:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            check=False
+            check=False,
+            timeout=timeout
         )
         if res.returncode != 0:
             return f"Git error (exit {res.returncode}): {res.stderr.strip()}"
         return res.stdout.strip()
+    except subprocess.TimeoutExpired:
+        return f"Git error: Command timed out after {timeout} seconds."
     except FileNotFoundError:
         return "Error: git executable not found on system PATH."
     except Exception as e:

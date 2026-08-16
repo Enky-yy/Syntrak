@@ -86,10 +86,23 @@ def create_jwt_token(user_data: Dict[str, Any]) -> str:
     return jwt.encode(payload, _get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
+_revoked_tokens: set = set()
+
+
+def revoke_jwt_token(token: str) -> None:
+    """Add a token to the revoked token blacklist."""
+    if token and token.strip():
+        _revoked_tokens.add(token.strip())
+
+
 def decode_jwt_token(token: str) -> Dict[str, Any]:
     """Decode and validate a JWT session token."""
+    cleaned = token.strip() if token else ""
+    if cleaned in _revoked_tokens:
+        raise HTTPException(status_code=401, detail="Session has been revoked. Please log in again.")
+
     try:
-        payload = jwt.decode(token, _get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(cleaned, _get_jwt_secret(), algorithms=[JWT_ALGORITHM])
         return {
             "id": payload["sub"],
             "email": payload.get("email", ""),
@@ -123,10 +136,11 @@ async def get_current_user(
         except HTTPException:
             pass
 
-    # Default to guest developer session
+    # Guest session: check for guest cookie or header if provided, otherwise default to GUEST_USER_ID
+    guest_id = request.headers.get("X-Guest-ID") or request.cookies.get("syntrak_guest_id") or GUEST_USER_ID
     return {
-        "id": GUEST_USER_ID,
-        "email": "guest@local.user",
+        "id": guest_id,
+        "email": f"{guest_id}@local.user",
         "name": "Guest Developer",
         "picture": ""
     }
